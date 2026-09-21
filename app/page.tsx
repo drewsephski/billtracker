@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Heading, Text, Eyebrow } from "@/components/ui/typography";
 import { BillCard } from "@/components/bill-card";
+import { HouseholdActivity } from "@/components/household-activity";
 import { demoData } from "@/lib/demo";
 export default function Home() {
   const data = demoData();
@@ -96,6 +97,12 @@ export default function Home() {
             </div>
           </Reveal>
         </section>
+        <section
+          aria-label="Try Homeshare chat"
+          className="mx-auto max-w-3xl py-8"
+        >
+          <HouseholdActivity data={data} demo />
+        </section>
         <section className="flex flex-col gap-8 py-8">
           <div className="flex flex-col gap-2">
             <Eyebrow>Less admin. More living.</Eyebrow>
@@ -124,10 +131,17 @@ export default function Home() {
                   "Set monthly bills once. New bills appear automatically, and your payment history stays intact.",
               },
             ].map(({ blob, title, description }) => (
-              <Card key={title}>
+              <Card
+                key={title}
+                className="transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-14px_rgb(28_35_70/0.28)] motion-reduce:transform-none"
+              >
                 <CardHeader>
-                  <div className="mb-2 flex justify-end">
-                    <Blob variant={blob} sizes="96px" className="size-24" />
+                  <div className="mb-2 flex h-24 items-center justify-center">
+                    <Blob
+                      variant={blob}
+                      sizes="96px"
+                      className="size-24 transition-transform duration-200 ease-out group-hover/card:scale-[1.025] motion-reduce:transform-none"
+                    />
                   </div>
                   <CardTitle>{title}</CardTitle>
                 </CardHeader>

@@ -8,6 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { ChatComposer } from "./chat-composer";
@@ -34,6 +35,7 @@ export function HouseChat({
   memberCount,
   timeZone,
   initial,
+  demo = false,
 }: {
   householdId: string;
   householdName: string;
@@ -42,6 +44,7 @@ export function HouseChat({
   memberCount: number;
   timeZone: string;
   initial: ChatPage;
+  demo?: boolean;
 }) {
   const router = useRouter();
   const hydrated = useSyncExternalStore(
@@ -142,6 +145,7 @@ export function HouseChat({
   }, [messages, outbox]);
   const poll = useCallback(async () => {
     if (
+      demo ||
       polling.current ||
       blocked.current ||
       document.visibilityState !== "visible" ||
@@ -198,8 +202,9 @@ export function HouseChat({
     } finally {
       polling.current = false;
     }
-  }, [householdId, router]);
+  }, [demo, householdId, router]);
   useEffect(() => {
+    if (demo) return;
     const initialPoll = window.setTimeout(() => void poll(), 0);
     const timer = window.setInterval(() => void poll(), 10_000);
     const visible = () => void poll();
@@ -211,9 +216,9 @@ export function HouseChat({
       document.removeEventListener("visibilitychange", visible);
       window.removeEventListener("online", visible);
     };
-  }, [poll]);
+  }, [demo, poll]);
   async function transmit(item: Outbox) {
-    if (blocked.current || sending.current.has(item.clientKey)) return;
+    if (demo || blocked.current || sending.current.has(item.clientKey)) return;
     sending.current.add(item.clientKey);
     setOutbox((items) =>
       items.map((m) =>
@@ -264,7 +269,7 @@ export function HouseChat({
       refresh?: boolean;
     },
   ) {
-    if (actionLock.current || blocked.current) return;
+    if (demo || actionLock.current || blocked.current) return;
     actionLock.current = true;
     setBusy(id);
     setNotice("");
@@ -321,6 +326,12 @@ export function HouseChat({
   }
   function send() {
     if (!text.trim() || blocked.current) return;
+    if (demo) {
+      setNotice(
+        "This is a read-only demo. Sign up to message your own household.",
+      );
+      return;
+    }
     if (continuation) {
       void action(continuation, { text });
       return;
@@ -339,7 +350,7 @@ export function HouseChat({
     composer.current?.focus();
   }
   async function loadOlder() {
-    if (older || !messages.length) return;
+    if (demo || older || !messages.length) return;
     setOlder(true);
     try {
       const response = await fetch(`/api/chat?before=${messages[0].cursor}`, {
@@ -494,6 +505,18 @@ export function HouseChat({
             </Button>
           )}
           <div className="z-10 shrink-0 border-t bg-card px-3 pt-3 pb-[max(.75rem,env(safe-area-inset-bottom))] sm:px-5">
+            {demo && (
+              <p className="mb-3 text-xs text-muted-foreground">
+                A read-only demo of life at home.{" "}
+                <Link
+                  href="/sign-up"
+                  className="font-medium text-primary underline underline-offset-4"
+                >
+                  Sign up
+                </Link>{" "}
+                to start your household’s conversation.
+              </p>
+            )}
             {notice && (
               <p role="status" className="mb-2 text-xs text-muted-foreground">
                 {notice}

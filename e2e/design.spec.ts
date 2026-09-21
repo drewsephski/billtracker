@@ -1,5 +1,70 @@
 import { test, expect, type Locator } from "@playwright/test";
 
+test("public chat previews stay read-only and link to the demo group chat", async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route(/\/api\/(activity|chat)(\/|\?|$)/, async (route) => {
+    requests.push(route.request().url());
+    await route.abort();
+  });
+  for (const path of ["/", "/demo", "/demo/dashboard"]) {
+    await page.goto(path);
+    await expect(
+      page.getByRole("heading", { name: "Tell Homeshare what happened" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: /^Record a contribution/ }).click();
+    await expect(
+      page.getByRole("textbox", { name: "Describe bill activity" }),
+    ).toHaveValue("I paid $25 toward Internet.");
+    await page
+      .getByRole("button", { name: "Send activity", exact: true })
+      .click();
+    await expect(page.getByRole("status")).toContainText("read-only demo");
+    await expect(
+      page.getByRole("textbox", { name: "Describe bill activity" }),
+    ).toHaveValue("I paid $25 toward Internet.");
+    const link = page.getByRole("link", {
+      name: "Open group chat",
+      exact: true,
+    });
+    await expect(link).toHaveAttribute("href", "/demo/chat");
+    await expect(
+      link.locator('[data-animated-icon="chevron-right"]'),
+    ).toBeVisible();
+    await link.click();
+    await expect(
+      page.getByRole("heading", { name: "House Chat", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("log", { name: "Household messages" }),
+    ).toContainText("Your Internet share is $25.");
+    await page
+      .getByRole("textbox", { name: "Message your household" })
+      .fill("Hello, housemates!");
+    await page
+      .getByRole("button", { name: "Send message", exact: true })
+      .click();
+    await expect(page.getByRole("status")).toContainText("read-only demo");
+    await expect(page.getByRole("log")).not.toContainText("Hello, housemates!");
+    await expect(
+      page.getByRole("link", { name: "Sign up", exact: true }),
+    ).toHaveAttribute("href", "/sign-up");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await expect(
+      page.getByRole("button", { name: "Send message", exact: true }),
+    ).toBeInViewport();
+  }
+  expect(requests).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test("bill date picker fits mobile and preserves calendar dates across time zones", async ({
   browser,
 }, testInfo) => {

@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Heading, Text } from "@/components/ui/typography";
 
 import { GettingStarted } from "./getting-started";
+import { HouseholdActivity } from "./household-activity";
 import { BillDialog } from "./bill-form";
 import { CategoryIcon, StatusBadge } from "./bill-card";
 import { Blob } from "./blob";
@@ -101,24 +102,7 @@ export function Dashboard({
           </Link>
         </Button>
       </section>
-      {!demo && (
-        <Link
-          href="/chat"
-          className="flex items-center justify-between gap-4 rounded-2xl border bg-card p-5 transition-colors hover:bg-secondary/50"
-        >
-          <div>
-            <Heading level={2} className="text-lg">
-              House Chat
-            </Heading>
-            <Text small muted>
-              Your housemates, your bills, and a little help from Homeshare.
-            </Text>
-          </div>
-          <span className="shrink-0 text-sm font-medium text-primary">
-            Open chat →
-          </span>
-        </Link>
-      )}
+      <HouseholdActivity data={data} demo={demo} />
       <section aria-label="Household this month" className="space-y-3 px-1">
         <div className="flex items-center justify-between gap-3">
           <Text small className="font-medium">

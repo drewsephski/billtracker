@@ -47,9 +47,7 @@ export function AppShell({
     path === `${prefix}${href}` ||
     (href === "/bills" && path.startsWith(`${prefix}/bills/`)) ||
     (demo && path === "/demo" && href === "/dashboard");
-  const visibleLinks = demo
-    ? links.filter((link) => link.href !== "/chat")
-    : links;
+  const visibleLinks = links;
   const nav = visibleLinks.map(({ href, label, icon }) => (
     <Button
       key={href}
@@ -175,7 +173,7 @@ export function AppShell({
         <main
           id="main-content"
           className={
-            path === "/chat"
+            path === `${prefix}/chat`
               ? "mx-auto flex w-full max-w-4xl px-2 pt-2 sm:px-9 sm:pt-4"
               : "mx-auto flex w-full max-w-6xl px-5 pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-9 sm:pt-10 lg:pb-10"
           }
@@ -190,7 +188,7 @@ export function AppShell({
       </div>
       <nav
         aria-label="Mobile navigation"
-        className={`fixed inset-x-0 bottom-0 z-30 grid ${demo ? "grid-cols-4" : "grid-cols-5"} gap-1 border-t border-border/70 bg-card/95 px-3 pt-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden`}
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 gap-1 border-t border-border/70 bg-card/95 px-3 pt-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden"
       >
         {visibleLinks.map(({ href, label, icon }) => (
           <Button

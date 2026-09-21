@@ -5,7 +5,8 @@ import { BillsView } from "@/components/bills-view";
 import { BillDetail } from "@/components/bill-detail";
 import { HouseholdView } from "@/components/household-view";
 import { SettingsView } from "@/components/settings-view";
-import { demoData } from "@/lib/demo";
+import { HouseChat } from "@/components/house-chat";
+import { demoChat, demoData } from "@/lib/demo";
 export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Explore Homeshare",
@@ -24,6 +25,20 @@ export default async function Page({
   let content;
   if (!path.length || path[0] === "dashboard")
     content = <Dashboard data={data} demo />;
+  else if (path[0] === "chat")
+    content = (
+      <HouseChat
+        key={data.household.id}
+        householdId={data.household.id}
+        householdName={data.household.name}
+        viewerId={data.viewer.id}
+        viewerName={data.viewer.name}
+        memberCount={data.members.length}
+        timeZone={data.household.timeZone}
+        initial={demoChat(data)}
+        demo
+      />
+    );
   else if (path[0] === "bills" && path[1]) {
     const bill = data.bills.find((b) => b.id === path[1]);
     if (!bill) notFound();

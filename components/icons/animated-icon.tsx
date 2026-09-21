@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { ArrowRightIcon } from "./lucide-animated/arrow-right";
 import { ArrowUpRightIcon } from "./lucide-animated/arrow-up-right";
 import { ArrowLeftIcon } from "./lucide-animated/arrow-left";
+import { ChevronRightIcon } from "./lucide-animated/chevron-right";
 import { ChevronDownIcon } from "./lucide-animated/chevron-down";
 import { ChevronUpIcon } from "./lucide-animated/chevron-up";
 import { UndoIcon } from "./lucide-animated/undo";
@@ -26,6 +27,7 @@ const icons = {
   "arrow-up-right": ArrowUpRightIcon,
   "arrow-left": ArrowLeftIcon,
   "chevron-down": ChevronDownIcon,
+  "chevron-right": ChevronRightIcon,
   "chevron-up": ChevronUpIcon,
   undo: UndoIcon,
   home: HomeIcon,

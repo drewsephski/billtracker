@@ -6,6 +6,46 @@ import {
   type Category,
 } from "./domain/bills";
 import type { HouseholdData, MemberView, BillView } from "./domain/types";
+import type { ChatPage } from "./domain/chat";
+
+export function demoChat(data: HouseholdData): ChatPage {
+  const messages = [
+    {
+      member: data.members[1],
+      text: "Hey everyone! The electricity bill is in. Thanks for keeping on top of your shares.",
+    },
+    {
+      member: data.viewer,
+      text: "Mine’s sorted! @Homeshare what do I still have left to pay?",
+    },
+    {
+      text: "Your Internet share is $25. Your other shares are settled. A little less admin, a little more living.",
+    },
+    {
+      member: data.members[2],
+      text: "Thanks! I’ll sort my electricity share this afternoon.",
+    },
+  ];
+  return {
+    householdId: data.household.id,
+    hasMore: false,
+    messages: messages.map(({ member, text }, index) => ({
+      id: `demo-message-${index}`,
+      cursor: String(index + 1),
+      clientKey: `demo-message-${index}`,
+      kind: member ? "human" : "assistant",
+      senderId: member?.id ?? null,
+      senderName: member?.name ?? "Homeshare",
+      text,
+      createdAt: `${data.today}T15:0${index}:00.000Z`,
+      sourceId: null,
+      reply: null,
+      actionable: false,
+      replyOwner: null,
+    })),
+  };
+}
+
 export function demoData(): HouseholdData {
   const today = todayInZone("America/Chicago");
   const id = (n: number) =>

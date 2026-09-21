@@ -34,10 +34,12 @@ export function ActivityChat({
   householdId,
   householdName,
   today,
+  demo = false,
 }: {
   householdId: string;
   householdName: string;
   today: string;
+  demo?: boolean;
 }) {
   const router = useRouter();
   const hydrated = useSyncExternalStore(
@@ -124,6 +126,12 @@ export function ActivityChat({
   async function send(text: string, choice?: number) {
     if (!text.trim() || pending || confirming || promptPlaceholder.test(text))
       return;
+    if (demo) {
+      setNotice(
+        "This is a read-only demo. Sign up to record activity in your own home.",
+      );
+      return;
+    }
     choice ??=
       selectedChoice?.text === text ? selectedChoice.choice : undefined;
     setSelectedChoice(undefined);
@@ -135,7 +143,7 @@ export function ActivityChat({
     await sendMessage({ text }, { body: { token: context, choice, sources } });
   }
   async function confirm() {
-    if (!reply?.token || inFlight.current) return;
+    if (demo || !reply?.token || inFlight.current) return;
     inFlight.current = true;
     setConfirming(true);
     setNotice("");
@@ -180,14 +188,35 @@ export function ActivityChat({
             first.
           </Text>
         </div>
-        {!messages.length && (!reply || reply.kind === "success") && (
-          <ActivityStarters
-            key={sourceEpoch}
-            householdId={householdId}
-            disabled={!hydrated || pending || confirming}
-            onPick={pick}
-          />
-        )}
+        {!messages.length &&
+          (!reply || reply.kind === "success") &&
+          (demo ? (
+            <ActivityPromptChoices
+              prompts={[
+                {
+                  label: "Record a contribution",
+                  text: "I paid $25 toward Internet.",
+                },
+                {
+                  label: "Add a shared bill",
+                  text: "Add a $30 household supplies bill due today, split equally. I paid my $10 share.",
+                },
+                {
+                  label: "Record a roommate’s share",
+                  text: "Emma paid $30.80 toward Gas.",
+                },
+              ]}
+              disabled={!hydrated}
+              onPick={pick}
+            />
+          ) : (
+            <ActivityStarters
+              key={sourceEpoch}
+              householdId={householdId}
+              disabled={!hydrated || pending || confirming}
+              onPick={pick}
+            />
+          ))}
         <div
           className="max-h-64 min-w-0 space-y-3 overflow-y-auto overscroll-contain"
           aria-label="Conversation"
@@ -317,7 +346,19 @@ export function ActivityChat({
             </Button>
           </form>
         )}
-        {!p && (
+        {demo && (
+          <Text small muted>
+            Explore a read-only demo.{" "}
+            <Link
+              href="/sign-up"
+              className="font-medium text-primary underline underline-offset-4"
+            >
+              Sign up
+            </Link>{" "}
+            to chat and record activity with your household.
+          </Text>
+        )}
+        {!p && !demo && (
           <div className="space-y-2">
             <Button
               type="button"
