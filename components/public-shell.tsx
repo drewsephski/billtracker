@@ -26,10 +26,10 @@ export function PublicShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-dvh">
-      <header className="mx-auto flex max-w-7xl items-center justify-between p-5 sm:px-10">
+    <div className="flex min-h-dvh flex-col">
+      <header className="mx-auto flex w-full max-w-7xl shrink-0 items-center justify-between gap-3 px-5 py-6 sm:px-10">
         <Brand />
-        <div className="flex items-center gap-1">
+        <nav aria-label="Account" className="flex items-center gap-2">
           {showInviteLink && (
             <Button variant="ghost" asChild>
               <Link href="/join">Have an invite?</Link>
@@ -42,9 +42,9 @@ export function PublicShell({
           >
             <Link href="/demo">Take a peek</Link>
           </Button>
-        </div>
+        </nav>
       </header>
-      <main className="mx-auto grid max-w-5xl items-center gap-10 px-5 py-5 md:grid-cols-[0.9fr_1.1fr] md:gap-16 md:py-12">
+      <main className="min-h-0 flex-1 mx-auto grid max-w-5xl items-center gap-10 px-5 py-5 md:grid-cols-[0.9fr_1.1fr] md:grid-rows-[minmax(0,1fr)] md:gap-16 md:py-12">
         <div className="hidden flex-col gap-7 md:flex">
           <Blob variant={variant} sizes="144px" className="size-36" />
           <Eyebrow>Shared home. Clear bills.</Eyebrow>
