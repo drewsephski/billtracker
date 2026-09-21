@@ -143,4 +143,37 @@ describe("chat transport boundary", () => {
     );
     expect(mocks.confirm).not.toHaveBeenCalled();
   });
+  it("streams draft text before completion but withholds the proposal until validation", async () => {
+    const gate = Promise.withResolvers<void>();
+    mocks.interpret.mockImplementationOnce(async ({ onSummary }) => {
+      onSummary("**Draft");
+      await gate.promise;
+      onSummary("** notes");
+      return intent;
+    });
+    const response = await POST(request("I paid $10 toward Internet"));
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let received = "";
+    try {
+      while (!received.includes("text-delta")) {
+        const chunk = await reader.read();
+        if (chunk.done) throw new Error("Stream ended before draft text");
+        received += decoder.decode(chunk.value);
+      }
+      expect(received).toContain("**Draft");
+      expect(received).not.toContain("data-activity");
+      expect(mocks.confirm).not.toHaveBeenCalled();
+    } finally {
+      gate.resolve();
+    }
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      received += decoder.decode(chunk.value);
+    }
+    expect(replyFrom(received).kind).toBe("proposal");
+    expect(received).toContain("text-end");
+    expect(mocks.confirm).not.toHaveBeenCalled();
+  });
 });
