@@ -20,6 +20,8 @@ test("house chat: shared persistence, pagination, retries, private proposals, sw
   const users: string[] = [];
   const secondContext = await browser.newContext({ ignoreHTTPSErrors: true });
   const second = await secondContext.newPage();
+  page.setDefaultTimeout(20_000);
+  second.setDefaultTimeout(20_000);
   const base = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3000")
     .origin;
   async function signup(target: Page, name: string, label: string) {
@@ -122,6 +124,30 @@ test("house chat: shared persistence, pagination, retries, private proposals, sw
     await expectChat(
       page.getByRole("heading", { name: "House Chat" }),
     ).toBeVisible();
+    const composer = page.getByLabel("Message your household");
+    await composer.fill("@");
+    const mention = page.getByRole("option", { name: /Homeshare AI/ });
+    await expectChat(mention).toBeVisible();
+    await mention.click();
+    await expectChat(composer).toHaveValue("@Homeshare ");
+    await expectChat(
+      page
+        .getByTestId("chat-composer-highlight")
+        .locator("[data-chat-mention]"),
+    ).toHaveText("@Homeshare");
+    await composer.fill("@ho");
+    await composer.press("Tab");
+    await expectChat(composer).toHaveValue("@Homeshare ");
+    await expectChat(composer).toBeFocused();
+    await composer.fill("@");
+    await composer.press("Enter");
+    await expectChat(composer).toHaveValue("@Homeshare ");
+    await page
+      .getByLabel("House Chat", { exact: true })
+      .screenshot({
+        path: `test-results/chat-mention-${test.info().project.name}.png`,
+      });
+    await composer.fill("");
     await page.getByRole("button", { name: "Load older messages" }).click();
     await expectChat(
       log.getByText("Earlier message 0", { exact: true }),
@@ -177,6 +203,9 @@ test("house chat: shared persistence, pagination, retries, private proposals, sw
     await expectChat(
       log.getByText(/Electricity has an outstanding balance/),
     ).toBeVisible();
+    await expectChat(log.locator("[data-chat-mention]").first()).toHaveText(
+      "@Homeshare",
+    );
     await send(page, "I paid $10 toward electricity");
     let proposal = log.getByTestId("activity-proposal").last();
     await expectChat(proposal).toContainText("Alex Owner");

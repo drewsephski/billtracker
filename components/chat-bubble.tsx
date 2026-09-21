@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { ChatMentionText } from "./chat-mention-text";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { Blob } from "./blob";
@@ -83,7 +84,10 @@ export function ChatBubble({
             className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${mine ? "rounded-br-md bg-primary text-primary-foreground" : ai ? "border bg-background" : "rounded-bl-md bg-secondary"}`}
           >
             <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-              {m.text}
+              <ChatMentionText
+                text={m.text}
+                appearance={mine ? "own" : "message"}
+              />
             </p>
             {m.reply?.proposal && (
               <div className="mt-3">

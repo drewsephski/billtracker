@@ -4,7 +4,7 @@ import { chatJobs, chatMessages, members } from "@/lib/db/schema";
 import { DomainError } from "@/lib/domain/bills";
 import type { Identity } from "./auth";
 import { inHousehold } from "./households";
-import { appendChatReply, publicReply, sendChat } from "./chat";
+import { appendChatReply, publicReply, sendChat, lockChat } from "./chat";
 import { chooseActivity, confirmActivity, prepareActivity } from "./activity";
 import { verifyActivity } from "./activity-token";
 import { interpretActivity } from "./activity-interpreter";
@@ -110,11 +110,9 @@ export async function confirmChatActivity(
   });
   if (pending.result) return pending.result;
   const action = pending.action!;
-  const result = await confirmActivity(
-    user,
-    householdId,
-    action.token,
-    async (tx, reply) => {
+  const result = await confirmActivity(user, householdId, action.token, {
+    before: (tx) => lockChat(tx, householdId),
+    after: async (tx, reply) => {
       // The financial transaction rolls back if cancellation/refresh won the race.
       await ownedAction(tx, user, householdId, messageId, true);
       await appendChatReply(
@@ -125,7 +123,7 @@ export async function confirmChatActivity(
         reply.kind === "success" ? "system" : "assistant",
       );
     },
-  );
+  });
   return publicReply(result);
 }
 export async function continueChatActivity(
@@ -186,6 +184,7 @@ export async function continueChatActivity(
     }
   }
   await inHousehold(user, householdId, async (tx) => {
+    await lockChat(tx, householdId);
     await ownedAction(tx, user, householdId, messageId, true);
     await appendChatReply(
       tx,

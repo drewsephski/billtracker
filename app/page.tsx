@@ -106,31 +106,27 @@ export default function Home() {
           <div className="grid gap-5 md:grid-cols-3">
             {[
               {
-                icon: "home" as const,
                 blob: "home" as const,
                 title: "Your bills have a home.",
                 description:
                   "See what’s coming up, what’s overdue, and what’s already paid. No buried group-chat messages.",
               },
               {
-                icon: "users" as const,
                 blob: "receipt" as const,
                 title: "A fair share for everyone.",
                 description:
                   "Split equally or set custom amounts. Everyone can see their part and mark it paid.",
               },
               {
-                icon: "refresh-cw" as const,
                 blob: "calendar" as const,
                 title: "Ready for next month.",
                 description:
                   "Set monthly bills once. New bills appear automatically, and your payment history stays intact.",
               },
-            ].map(({ icon, blob, title, description }) => (
-              <Card key={title} data-animated-icon-trigger>
+            ].map(({ blob, title, description }) => (
+              <Card key={title}>
                 <CardHeader>
-                  <div className="mb-2 flex items-center justify-between gap-4">
-                    <AnimatedIcon name={icon} className="size-6 text-primary" />
+                  <div className="mb-2 flex justify-end">
                     <Blob variant={blob} sizes="96px" className="size-24" />
                   </div>
                   <CardTitle>{title}</CardTitle>

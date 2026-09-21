@@ -5,11 +5,13 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
+import { ChatComposer } from "./chat-composer";
+import { ChatMentionText } from "./chat-mention-text";
 import { Blob } from "./blob";
 import { ChatBubble } from "./chat-bubble";
 import {
@@ -19,6 +21,8 @@ import {
   type ChatPage,
 } from "@/lib/domain/chat";
 import type { ActivityReply } from "@/lib/domain/activity";
+
+const subscribeToHydration = () => () => {};
 
 type Outbox = { clientKey: string; text: string; failed: boolean };
 type Page = ChatPage & { updates: ChatMessage[] };
@@ -40,6 +44,11 @@ export function HouseChat({
   initial: ChatPage;
 }) {
   const router = useRouter();
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
   const [messages, setMessages] = useState(initial.messages);
   const [hasOlder, setHasOlder] = useState(initial.hasMore);
   const [outbox, setOutbox] = useState<Outbox[]>([]);
@@ -449,7 +458,7 @@ export function HouseChat({
                   {viewerName}
                 </p>
                 <p className="rounded-2xl rounded-br-md bg-primary/75 px-4 py-3 text-left text-sm whitespace-pre-wrap break-words text-primary-foreground">
-                  {item.text}
+                  <ChatMentionText text={item.text} appearance="own" />
                 </p>
                 {item.failed ? (
                   <Button
@@ -512,37 +521,26 @@ export function HouseChat({
                 send();
               }}
             >
-              <Textarea
-                ref={composer}
-                aria-label="Message your household"
+              <ChatComposer
+                textareaRef={composer}
+                disabled={!hydrated}
                 placeholder={
                   continuation
                     ? "Add the missing details…"
                     : "Message your home…"
                 }
                 value={text}
-                maxLength={1000}
-                rows={1}
-                className="min-h-11 max-h-32 resize-none rounded-2xl bg-background text-base"
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    !e.shiftKey &&
-                    !e.nativeEvent.isComposing &&
-                    window.matchMedia("(pointer: fine)").matches
-                  ) {
-                    e.preventDefault();
-                    send();
-                  }
-                }}
+                onChange={setText}
+                onSend={send}
               />
               <Button
                 type="submit"
                 size="icon"
                 className="size-11 shrink-0 rounded-full"
                 aria-label="Send message"
-                disabled={!text.trim() || Boolean(continuation && busy)}
+                disabled={
+                  !hydrated || !text.trim() || Boolean(continuation && busy)
+                }
               >
                 {busy && continuation ? (
                   <Loader2 className="size-4 animate-spin" />

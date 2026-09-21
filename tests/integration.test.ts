@@ -266,11 +266,23 @@ describe.skipIf(!enabled)(
       await expect(
         continueChatActivity(owner, householdId, proposal.id, { cancel: true }),
       ).rejects.toThrow("Only the roommate");
-      const first = await confirmChatActivity(
-        roommate,
-        householdId,
-        proposal.id,
+      const concurrentSend = sendChat(owner, householdId, {
+        text: "Thanks for recording that",
+        clientKey: randomUUID(),
+      });
+      const confirmations = await Promise.allSettled([
+        confirmChatActivity(roommate, householdId, proposal.id),
+        confirmChatActivity(roommate, householdId, proposal.id),
+      ]);
+      await expect(concurrentSend).resolves.toMatchObject({
+        text: "Thanks for recording that",
+      });
+      const committed = confirmations.find(
+        (result) => result.status === "fulfilled",
       );
+      if (!committed || committed.status !== "fulfilled")
+        throw new Error("Neither confirmation committed");
+      const first = committed.value;
       const retry = await confirmChatActivity(
         roommate,
         householdId,

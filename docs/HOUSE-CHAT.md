@@ -1,12 +1,16 @@
 # House Chat
 
 `/chat` is the household's shared conversation. The dashboard links to it;
-all current housemates can read the same persisted history. No DMs, reactions,
+all current housemates can read the same persisted history. Typing `@` opens
+a Homeshare mention picker; tap, Tab or Enter inserts it. Mentions are colored
+in the native textarea paint layer and in persisted message bubbles. No DMs, reactions,
 threads, transfers, or general file storage are introduced.
 
 ## Storage and tenant boundary
 
 Migration `0005_kind_jocasta.sql` adds `chat_messages` and `chat_jobs`.
+`0006_rapid_pixie.sql` indexes source-result lookups, sender rate checks, and
+unique active proposals.
 Messages have UUID identity, a bigint cursor, household, member sender, a
 historical display-name snapshot, kind, text, timestamp, client send key,
 optional source message, and safe activity display data. Composite foreign keys
@@ -94,13 +98,16 @@ Other tabs reject stale household headers and refresh before further work.
   a process-only deterministic OpenRouter stub:
 
   ```sh
+  NODE_EXTRA_CA_CERTS=/tmp/homeshare-e2e-cert.pem \
   HOMESHARE_BUILD_DIR=.next-chat HOMESHARE_E2E_LLM_STUB=true \
-  E2E_BASE_URL=http://localhost:3107 \
-  E2E_SERVER_COMMAND='NODE_OPTIONS="--require ./e2e/openrouter-stub.cjs" pnpm dev --port 3107' \
+  E2E_BASE_URL=https://localhost:3107 \
+  E2E_SERVER_COMMAND='NODE_OPTIONS="--require ./e2e/openrouter-stub.cjs" pnpm dev --port 3107 --experimental-https --experimental-https-key /tmp/homeshare-e2e-key.pem --experimental-https-cert /tmp/homeshare-e2e-cert.pem --experimental-https-ca /tmp/homeshare-e2e-cert.pem' \
   pnpm exec playwright test e2e/activity.spec.ts
   ```
 
-The separate build directory keeps concurrent local development independent.
+Use the temporary certificate setup in `ACTIVITY-CHAT.md`; HTTPS is required
+for WebKit secure cookies. The separate build directory keeps concurrent local
+development independent.
 Never enable the stub in deployment. It requires the designated development
 flag and is not imported by application code. Browser coverage uses two actual
 sessions and tests shared visibility, reload, historical pagination, failed-send

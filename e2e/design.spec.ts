@@ -168,17 +168,6 @@ test("official icons animate from their parent action and respect reduced motion
   );
   await viewBill.focus();
   await expect(billArrow).toHaveAttribute("data-animation-observed", "true");
-  const card = page
-    .locator("[data-animated-icon-trigger]")
-    .filter({ hasText: "Your bills have a home." });
-  const home = card.locator('[data-animated-icon="home"]');
-  await card.scrollIntoViewIfNeeded();
-  await expect(home).toBeVisible();
-  await watchIconAnimation(home);
-  if (isMobile) await card.tap({ position: { x: 100, y: 100 } });
-  else await card.hover({ position: { x: 100, y: 100 } });
-  await expect(home).toHaveAttribute("data-animation-observed", "true");
-
   const action = page.getByRole("link", { name: "Bring your home together" });
   const arrow = action.locator('[data-animated-icon="arrow-right"]');
   await action.scrollIntoViewIfNeeded();
@@ -188,13 +177,12 @@ test("official icons animate from their parent action and respect reduced motion
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.reload();
-  await card.scrollIntoViewIfNeeded();
-  await watchIconAnimation(home);
-  if (isMobile) await card.tap({ position: { x: 100, y: 100 } });
-  else await card.hover({ position: { x: 100, y: 100 } });
+  await action.scrollIntoViewIfNeeded();
+  await watchIconAnimation(arrow);
+  await action.focus();
   // Allow the complete upstream animation duration to elapse before asserting no motion.
   await page.waitForTimeout(700);
-  await expect(home).not.toHaveAttribute("data-animation-observed", "true");
+  await expect(arrow).not.toHaveAttribute("data-animation-observed", "true");
 });
 
 for (const width of [320, 390, 430]) {
@@ -348,17 +336,17 @@ test("payment actions keep their alignment when feedback appears", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  for (const width of [350, 891, 1280]) {
+  for (const width of [350, 390, 891, 1280, 1822]) {
     await page.setViewportSize({ width, height: 908 });
-    await page.goto("/demo/bills/00000000-0000-4000-8000-000000000013");
+    await page.goto("/demo/bills/00000000-0000-4000-8000-000000000011");
     for (const name of ["Emma", "Olivia"]) {
       const button = page.getByRole("button", {
-        name: `Mark paid for ${name}`,
+        name: `${name === "Emma" ? "Undo payment for" : "Mark paid for"} ${name}`,
         exact: true,
       });
       const before = await button.boundingBox();
       await button.click();
-      const row = button.locator("..");
+      const row = button.locator("../..");
       const feedback = row.getByRole("alert");
       await expect(feedback).toContainText("read-only demo");
       await expect(
@@ -370,6 +358,13 @@ test("payment actions keep their alignment when feedback appears", async ({
       const alertBounds = await feedback.boundingBox();
       expect(alertBounds!.width).toBeCloseTo(rowBounds!.width, 0);
       expect(alertBounds!.y).toBeGreaterThan(after!.y + after!.height);
+      expect(alertBounds!.x).toBeCloseTo(rowBounds!.x, 0);
+      expect(
+        await feedback.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth,
+        ),
+      ).toBe(true);
+      expect(alertBounds!.height).toBeLessThan(220);
     }
     expect(
       await page.evaluate(

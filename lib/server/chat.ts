@@ -322,6 +322,7 @@ export async function processChat(
         "Homeshare is temporarily unavailable. Your message is saved. Ask me again shortly, or record your share from Bills.";
   }
   await inHousehold(user, householdId, async (tx) => {
+    await lockChat(tx, householdId);
     const [job] = await tx
       .select()
       .from(chatJobs)

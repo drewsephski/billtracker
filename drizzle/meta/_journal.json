@@ -43,6 +43,13 @@
       "when": 1790009739525,
       "tag": "0005_kind_jocasta",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790011504518,
+      "tag": "0006_rapid_pixie",
+      "breakpoints": true
     }
   ]
 }

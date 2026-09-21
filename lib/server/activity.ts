@@ -109,7 +109,10 @@ export async function confirmActivity(
   user: Identity,
   activeHouseholdId: string,
   token: string,
-  onResult?: (tx: Transaction, result: ActivityReply) => Promise<void>,
+  hooks: {
+    before?: (tx: Transaction) => Promise<void>;
+    after?: (tx: Transaction, result: ActivityReply) => Promise<void>;
+  } = {},
 ): Promise<ActivityReply> {
   const context = verifyActivity(token, user.id, activeHouseholdId, {
     allowExpired: true,
@@ -118,8 +121,11 @@ export async function confirmActivity(
     throw new DomainError("There is no contribution ready to confirm.");
   const expected = context.resolution.proposal;
   return inHousehold(user, activeHouseholdId, async (tx, actor) => {
+    // Chat acquires its publication lock before household/bill locks, matching
+    // message inserts that must also acquire household foreign-key locks.
+    await hooks.before?.(tx);
     const finish = async (result: ActivityReply) => {
-      await onResult?.(tx, result);
+      await hooks.after?.(tx, result);
       return result;
     };
     // Serialize retries BEFORE creating anything. The ledger unique index is a

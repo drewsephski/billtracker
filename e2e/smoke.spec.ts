@@ -66,7 +66,13 @@ test("unauthenticated household routes and cron are protected", async ({
   page,
   request,
 }) => {
-  for (const route of ["/dashboard", "/bills", "/household", "/settings"]) {
+  for (const route of [
+    "/dashboard",
+    "/chat",
+    "/bills",
+    "/household",
+    "/settings",
+  ]) {
     await page.goto(route);
     await expect(page).toHaveURL(/\/sign-in/);
   }

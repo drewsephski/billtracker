@@ -18,7 +18,7 @@ import { Heading, Text } from "@/components/ui/typography";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CategoryIcon, StatusBadge } from "./bill-card";
 import { BillDialog } from "./bill-form";
-import { PaymentButton } from "./payment-button";
+import { PaymentActions } from "./payment-actions";
 import type { HouseholdData, BillView } from "@/lib/domain/types";
 import {
   money,
@@ -53,9 +53,9 @@ export function BillDetail({
         </Button>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-4">
           <CategoryIcon category={bill.category} />
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <Heading>{bill.name}</Heading>
             <Text muted>
               Due {dateLabel(bill.dueDate, true)} · {bill.category}
@@ -72,7 +72,7 @@ export function BillDetail({
           />
         )}
       </div>
-      <div className="grid items-start gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="order-1 flex flex-col gap-6 lg:order-2">
           <Card>
             <CardHeader>
@@ -87,7 +87,7 @@ export function BillDetail({
                 value={(bill.paidCents / bill.amountCents) * 100}
                 aria-label="Amount paid"
               />
-              <div className="flex justify-between">
+              <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
                 <Text small muted>
                   Paid {money(bill.paidCents)}
                 </Text>
@@ -138,7 +138,7 @@ export function BillDetail({
                           : "Still to pay"}
                     </Text>
                   </div>
-                  <Text className="text-right text-lg font-semibold tabular-nums">
+                  <Text className="whitespace-nowrap text-right text-lg font-semibold tabular-nums">
                     {money(share.amountCents)}
                   </Text>
                   {share.amountCents === 0 ? (
@@ -153,35 +153,21 @@ export function BillDetail({
                       data.viewer.id,
                       share.memberId,
                     ) ? (
-                    <div className="col-span-2 col-start-2 flex flex-wrap justify-end gap-1 @min-[440px]:col-span-1 @min-[440px]:col-start-auto">
-                      {share.paidCents < share.amountCents && (
-                        <PaymentButton
-                          householdId={data.household.id}
-                          billId={bill.id}
-                          splitId={share.id}
-                          paymentId={null}
-                          name={share.name}
-                          demo={demo}
-                        />
-                      )}
-                      {share.paymentId && (
-                        <PaymentButton
-                          className="col-span-2 col-start-2 justify-self-end @min-[440px]:col-span-1 @min-[440px]:col-start-auto @min-[440px]:w-28"
-                          householdId={data.household.id}
-                          billId={bill.id}
-                          splitId={share.id}
-                          paymentId={share.paymentId}
-                          undoLabel={
-                            share.activePaymentCount > 1 ||
-                            share.paidCents < share.amountCents
-                              ? "Undo latest"
-                              : "Undo"
-                          }
-                          name={share.name}
-                          demo={demo}
-                        />
-                      )}
-                    </div>
+                    <PaymentActions
+                      householdId={data.household.id}
+                      billId={bill.id}
+                      splitId={share.id}
+                      paymentId={share.paymentId}
+                      canPay={share.paidCents < share.amountCents}
+                      undoLabel={
+                        share.activePaymentCount > 1 ||
+                        share.paidCents < share.amountCents
+                          ? "Undo latest"
+                          : "Undo"
+                      }
+                      name={share.name}
+                      demo={demo}
+                    />
                   ) : (
                     <Badge
                       variant={
@@ -234,8 +220,8 @@ export function BillDetail({
           {history.length ? (
             history.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-3">
-                <CheckCircle2 className="size-5 text-muted-foreground" />
-                <div className="flex-1">
+                <CheckCircle2 className="size-5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
                   <Text small>
                     <strong>{p.memberName}</strong> · {money(p.amountCents)}
                     {p.reversedAt ? " · Undone" : " paid"}

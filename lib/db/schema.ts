@@ -247,6 +247,8 @@ export const chatMessages = pgTable(
     unique("chat_tenant_id").on(t.householdId, t.id),
     unique("chat_send_unique").on(t.householdId, t.kind, t.clientKey),
     index("chat_cursor_idx").on(t.householdId, t.sequence),
+    index("chat_source_idx").on(t.householdId, t.sourceId),
+    index("chat_sender_rate_idx").on(t.householdId, t.senderId, t.createdAt),
     foreignKey({
       columns: [t.householdId, t.senderId],
       foreignColumns: [members.householdId, members.id],
@@ -287,6 +289,10 @@ export const chatJobs = pgTable(
       columns: [t.householdId, t.activeMessageId],
       foreignColumns: [chatMessages.householdId, chatMessages.id],
     }),
+    uniqueIndex("chat_active_message_unique").on(
+      t.householdId,
+      t.activeMessageId,
+    ),
     index("chat_jobs_recovery_idx").on(t.householdId, t.state, t.leaseUntil),
     check("chat_job_state", sql`${t.state} in ('queued','processing','done')`),
   ],
