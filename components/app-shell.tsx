@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/typography";
 import { signOut } from "@/lib/server/actions";
 import type { HouseholdData } from "@/lib/domain/types";
+import { AccountMenu } from "./account-menu";
 const links = [
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/chat", label: "Chat", icon: "message-circle" },
@@ -157,9 +158,11 @@ export function AppShell({
               </>
             )}
             <ThemeToggle />
-            <Avatar className="hidden sm:flex">
-              <AvatarFallback>{data.viewer.name.slice(0, 1)}</AvatarFallback>
-            </Avatar>
+            <AccountMenu
+              name={data.viewer.name}
+              email={data.viewer.email}
+              demo={demo}
+            />
           </div>
         </header>
         {!demo && (
