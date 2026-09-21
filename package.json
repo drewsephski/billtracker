@@ -18,8 +18,11 @@
     "db:seed": "tsx --conditions=react-server scripts/seed.ts"
   },
   "dependencies": {
+    "@ai-sdk/react": "^4.0.110",
     "@neondatabase/auth": "0.5.0-beta",
+    "@openrouter/ai-sdk-provider": "^3.1.0",
     "@vercel/functions": "^3.9.8",
+    "ai": "^7.0.107",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.3.0",
     "date-fns": "^4.4.0",

@@ -12,6 +12,7 @@ export function PaymentButton({
   splitId,
   paymentId,
   name,
+  undoLabel = "Undo",
   demo,
   className,
 }: {
@@ -20,6 +21,7 @@ export function PaymentButton({
   splitId: string;
   paymentId: string | null;
   name: string;
+  undoLabel?: string;
   demo?: boolean;
   className?: string;
 }) {
@@ -64,7 +66,7 @@ export function PaymentButton({
         ) : (
           <AnimatedIcon name="check" data-icon="inline-start" />
         )}
-        {paymentId ? "Undo" : "Mark paid"}
+        {paymentId ? undoLabel : "Mark paid"}
       </Button>
       {(state.error || state.success) && (
         <div className="col-span-full min-w-0">

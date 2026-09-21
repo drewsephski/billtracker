@@ -133,7 +133,9 @@ export function BillDetail({
                     <Text small muted>
                       {share.paidCents >= share.amountCents
                         ? "All settled"
-                        : "Still to pay"}
+                        : share.paidCents > 0
+                          ? `${money(share.paidCents)} paid · ${money(share.amountCents - share.paidCents)} left`
+                          : "Still to pay"}
                     </Text>
                   </div>
                   <Text className="text-right text-lg font-semibold tabular-nums">
@@ -151,21 +153,49 @@ export function BillDetail({
                       data.viewer.id,
                       share.memberId,
                     ) ? (
-                    <PaymentButton
-                      className="col-span-2 col-start-2 justify-self-end @min-[440px]:col-span-1 @min-[440px]:col-start-auto @min-[440px]:w-28"
-                      householdId={data.household.id}
-                      billId={bill.id}
-                      splitId={share.id}
-                      paymentId={share.paymentId}
-                      name={share.name}
-                      demo={demo}
-                    />
+                    <div className="col-span-2 col-start-2 flex flex-wrap justify-end gap-1 @min-[440px]:col-span-1 @min-[440px]:col-start-auto">
+                      {share.paidCents < share.amountCents && (
+                        <PaymentButton
+                          householdId={data.household.id}
+                          billId={bill.id}
+                          splitId={share.id}
+                          paymentId={null}
+                          name={share.name}
+                          demo={demo}
+                        />
+                      )}
+                      {share.paymentId && (
+                        <PaymentButton
+                          className="col-span-2 col-start-2 justify-self-end @min-[440px]:col-span-1 @min-[440px]:col-start-auto @min-[440px]:w-28"
+                          householdId={data.household.id}
+                          billId={bill.id}
+                          splitId={share.id}
+                          paymentId={share.paymentId}
+                          undoLabel={
+                            share.activePaymentCount > 1 ||
+                            share.paidCents < share.amountCents
+                              ? "Undo latest"
+                              : "Undo"
+                          }
+                          name={share.name}
+                          demo={demo}
+                        />
+                      )}
+                    </div>
                   ) : (
                     <Badge
-                      variant={share.paymentId ? "success" : "outline"}
+                      variant={
+                        share.paidCents >= share.amountCents
+                          ? "success"
+                          : "outline"
+                      }
                       className="col-span-2 col-start-2 justify-self-end @min-[440px]:col-span-1 @min-[440px]:col-start-auto"
                     >
-                      {share.paymentId ? "Paid" : "Unpaid"}
+                      {share.paidCents >= share.amountCents
+                        ? "Paid"
+                        : share.paidCents > 0
+                          ? "Partly paid"
+                          : "Unpaid"}
                     </Badge>
                   )}
                 </div>

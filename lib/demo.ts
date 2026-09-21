@@ -37,6 +37,7 @@ export function demoData(): HouseholdData {
         id: id(100 + i * 10 + index),
         name: members[index].name,
         paidCents: index < paidCount ? a.amountCents : 0,
+        activePaymentCount: index < paidCount ? 1 : 0,
         paymentId: index < paidCount ? id(200 + i * 10 + index) : null,
       }));
       const paidCents = splits.reduce((s, a) => s + a.paidCents, 0);

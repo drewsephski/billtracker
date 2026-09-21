@@ -109,107 +109,169 @@ export async function saveBill(
         );
       return bill.id;
     }
-    let templateId: string | null = null;
-    if (value.recurring) {
-      const [template] = await tx
-        .insert(templates)
-        .values({
-          householdId,
-          name: value.name,
-          category: value.category,
-          amountCents: value.amount,
-          dayOfMonth: Number(value.dueDate.slice(-2)),
-          nextDueDate: nextMonth(
-            value.dueDate,
-            Number(value.dueDate.slice(-2)),
-          ),
-          splitMode: value.splitMode,
-          createdBy: user.id,
-        })
-        .returning();
-      templateId = template.id;
-      await tx.insert(templateSplits).values(
-        allocations.map((a) => ({
-          ...a,
-          householdId,
-          templateId: template.id,
-        })),
-      );
-    }
-    const [bill] = await tx
-      .insert(bills)
+    return createBillInTransaction(tx, user, householdId, value, allocations);
+  });
+}
+// Shared by manual creation and the atomic create-and-contribute command.
+export async function createBillInTransaction(
+  tx: Transaction,
+  user: Identity,
+  householdId: string,
+  value: ReturnType<typeof billSchema.parse>,
+  allocations: Awaited<ReturnType<typeof allocationsFor>>,
+) {
+  let templateId: string | null = null;
+  if (value.recurring) {
+    const [template] = await tx
+      .insert(templates)
       .values({
         householdId,
         name: value.name,
         category: value.category,
         amountCents: value.amount,
-        dueDate: value.dueDate,
-        notes: value.notes,
+        dayOfMonth: Number(value.dueDate.slice(-2)),
+        nextDueDate: nextMonth(value.dueDate, Number(value.dueDate.slice(-2))),
+        splitMode: value.splitMode,
         createdBy: user.id,
-        templateId,
-        period: templateId ? value.dueDate.slice(0, 7) : null,
       })
       .returning();
-    await tx
-      .insert(splits)
-      .values(allocations.map((a) => ({ ...a, householdId, billId: bill.id })));
-    return bill.id;
-  });
+    templateId = template.id;
+    await tx.insert(templateSplits).values(
+      allocations.map((a) => ({
+        ...a,
+        householdId,
+        templateId: template.id,
+      })),
+    );
+  }
+  const [bill] = await tx
+    .insert(bills)
+    .values({
+      householdId,
+      name: value.name,
+      category: value.category,
+      amountCents: value.amount,
+      dueDate: value.dueDate,
+      notes: value.notes,
+      createdBy: user.id,
+      templateId,
+      period: templateId ? value.dueDate.slice(0, 7) : null,
+    })
+    .returning();
+  await tx
+    .insert(splits)
+    .values(allocations.map((a) => ({ ...a, householdId, billId: bill.id })));
+  return bill.id;
 }
+
 export async function recordPayment(
   user: Identity,
   householdId: string,
   billId: string,
   splitId: string,
   undoPaymentId?: string,
+  amountCents?: number,
 ) {
   idSchema.parse(billId);
   idSchema.parse(splitId);
   if (undoPaymentId) idSchema.parse(undoPaymentId);
-  return inHousehold(user, householdId, async (tx, actor) => {
-    // Same bill lock as editing: a payment can never race a financial edit.
-    const [bill] = await tx
-      .select()
-      .from(bills)
-      .where(and(eq(bills.id, billId), eq(bills.householdId, householdId)))
-      .for("update");
-    if (!bill) throw new DomainError("Bill not found.");
-    const [share] = await tx
-      .select()
-      .from(splits)
+  return inHousehold(user, householdId, (tx, actor) =>
+    recordPaymentInTransaction(tx, user, householdId, actor, billId, splitId, {
+      undoPaymentId,
+      amountCents,
+    }),
+  );
+}
+export async function recordPaymentInTransaction(
+  tx: Transaction,
+  user: Identity,
+  householdId: string,
+  actor: typeof members.$inferSelect,
+  billId: string,
+  splitId: string,
+  options: {
+    undoPaymentId?: string;
+    amountCents?: number;
+    sourceCommandId?: string;
+    sourceCreatedBill?: boolean;
+  } = {},
+) {
+  // Lock BEFORE reading contributions. All financial edits use this same lock.
+  const [bill] = await tx
+    .select()
+    .from(bills)
+    .where(and(eq(bills.id, billId), eq(bills.householdId, householdId)))
+    .for("update");
+  if (!bill) throw new DomainError("Bill not found.");
+  const [share] = await tx
+    .select()
+    .from(splits)
+    .where(
+      and(
+        eq(splits.id, splitId),
+        eq(splits.billId, billId),
+        eq(splits.householdId, householdId),
+      ),
+    );
+  if (!share || !canManageShare(actor.role, actor.id, share.memberId))
+    throw new DomainError("You can only update your own share.");
+  const [payer] = await tx
+    .select()
+    .from(members)
+    .where(
+      and(eq(members.id, share.memberId), eq(members.householdId, householdId)),
+    )
+    .for("share");
+  if (!payer)
+    throw new DomainError("That roommate is no longer in this household.");
+  if (options.undoPaymentId) {
+    const [reversed] = await tx
+      .update(payments)
+      .set({ reversedAt: new Date(), reversedBy: user.id })
       .where(
         and(
-          eq(splits.id, splitId),
-          eq(splits.billId, billId),
-          eq(splits.householdId, householdId),
+          eq(payments.id, options.undoPaymentId),
+          eq(payments.splitId, splitId),
+          eq(payments.householdId, householdId),
+          isNull(payments.reversedAt),
         ),
-      );
-    if (!share || !canManageShare(actor.role, actor.id, share.memberId))
-      throw new DomainError("You can only update your own share.");
-    if (undoPaymentId) {
-      await tx
-        .update(payments)
-        .set({ reversedAt: new Date(), reversedBy: user.id })
-        .where(
-          and(
-            eq(payments.id, undoPaymentId),
-            eq(payments.splitId, splitId),
-            eq(payments.householdId, householdId),
-            isNull(payments.reversedAt),
-          ),
-        );
-    } else if (share.amountCents > 0) {
-      await tx
-        .insert(payments)
-        .values({
-          householdId,
-          splitId,
-          amountCents: share.amountCents,
-          recordedBy: user.id,
-        })
-        .onConflictDoNothing();
-    }
-  });
+      )
+      .returning();
+    return reversed;
+  }
+  const active = await tx
+    .select({ amountCents: payments.amountCents })
+    .from(payments)
+    .where(
+      and(
+        eq(payments.householdId, householdId),
+        eq(payments.splitId, splitId),
+        isNull(payments.reversedAt),
+      ),
+    );
+  const remaining =
+    share.amountCents - active.reduce((sum, p) => sum + p.amountCents, 0);
+  const amount = options.amountCents ?? remaining;
+  // Repeated manual "Mark paid" remains a harmless no-op.
+  if (remaining === 0 && options.amountCents === undefined) return;
+  if (!Number.isSafeInteger(amount) || amount <= 0)
+    throw new DomainError("Enter a positive contribution in whole cents.");
+  if (amount > remaining)
+    throw new DomainError(
+      "The contribution exceeds this roommate’s remaining share.",
+    );
+  const [payment] = await tx
+    .insert(payments)
+    .values({
+      householdId,
+      splitId,
+      amountCents: amount,
+      recordedBy: user.id,
+      sourceCommandId: options.sourceCommandId,
+      sourceCreatedBill: options.sourceCreatedBill ?? false,
+    })
+    .returning();
+  return payment;
 }
 export async function updateTemplate(
   user: Identity,

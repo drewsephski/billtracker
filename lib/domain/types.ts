@@ -37,7 +37,9 @@ export type BillView = {
     name: string;
     amountCents: number;
     paidCents: number;
+    /** Latest active contribution; undo targets this record only. */
     paymentId: string | null;
+    activePaymentCount: number;
   }[];
 };
 export type TemplateView = {

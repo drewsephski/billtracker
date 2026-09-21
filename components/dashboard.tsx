@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Heading, Text } from "@/components/ui/typography";
+import { ActivityChat } from "./activity-chat";
 import { GettingStarted } from "./getting-started";
 import { BillDialog } from "./bill-form";
 import { CategoryIcon, StatusBadge } from "./bill-card";
@@ -95,6 +96,13 @@ export function Dashboard({
           </Link>
         </Button>
       </section>
+      {!demo && (
+        <ActivityChat
+          key={household.id}
+          householdId={household.id}
+          householdName={household.name}
+        />
+      )}
       <section aria-label="Household this month" className="space-y-3 px-1">
         <div className="flex items-center justify-between gap-3">
           <Text small className="font-medium">

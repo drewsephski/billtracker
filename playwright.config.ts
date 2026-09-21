@@ -18,11 +18,16 @@ export default defineConfig({
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     {
       name: "mobile-webkit",
-      testMatch: ["design.spec.ts", "mobile-release.spec.ts"],
+      testMatch: [
+        "design.spec.ts",
+        "mobile-release.spec.ts",
+        "activity.spec.ts",
+      ],
       use: { ...devices["iPhone 13"] },
     },
   ],
   webServer: {
+    ignoreHTTPSErrors: true,
     command: process.env.E2E_SERVER_COMMAND || "pnpm dev",
     url: process.env.E2E_BASE_URL || "http://localhost:3000",
     reuseExistingServer: !process.env.CI,

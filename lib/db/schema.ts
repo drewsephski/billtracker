@@ -202,15 +202,16 @@ export const payments = pgTable(
       .notNull(),
     reversedAt: timestamp("reversed_at", { withTimezone: true }),
     reversedBy: text("reversed_by").references(() => profiles.id),
+    sourceCommandId: uuid("source_command_id"),
+    sourceCreatedBill: boolean("source_created_bill").notNull().default(false),
   },
   (t) => [
     foreignKey({
       columns: [t.householdId, t.splitId],
       foreignColumns: [splits.householdId, splits.id],
     }),
-    uniqueIndex("one_active_payment_per_split")
-      .on(t.splitId)
-      .where(sql`${t.reversedAt} is null`),
+    uniqueIndex("payment_source_command_unique").on(t.sourceCommandId),
+    index("payments_split_idx").on(t.householdId, t.splitId),
     index("payments_household_date_idx").on(t.householdId, t.recordedAt),
     check("payment_amount", sql`${t.amountCents} > 0`),
     check(

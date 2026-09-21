@@ -1,4 +1,6 @@
-# Payment semantics: product decision pending
+# Payment semantics: roommate settlement and provider payments
+
+**Current implementation:** The confirmed activity feature adds partial roommate contributions in migration 0004. Active contributions are summed per split, and manual “Mark paid” settles the remainder. Reversal targets one payment record. Provider payments and advances remain unsupported. See [ACTIVITY-CHAT.md](./ACTIVITY-CHAT.md). The source audit below describes the earlier full-share implementation and is retained as historical context.
 
 This is a source audit of HEAD `7203db7` and the mobile release slice. No financial schema, status rules, or balance calculation changes are implemented here.
 

@@ -179,3 +179,9 @@ Apply migration `0003_pretty_wraith.sql` with `pnpm db:migrate` before releasing
 The household menu on desktop and mobile switches homes or starts another household. A server-set, HTTP-only cookie remembers the choice; every read resolves it against the signed-in account’s memberships and every mutation independently authorizes the supplied household. Missing or stale preferences fall back to the oldest membership. Joining or creating a household selects it immediately. Switching returns to the dashboard and remounts household UI, preventing stale bill drafts from carrying into another home.
 
 Invitation links preview the household and prefill the invited email. Signup, sign-in, verification and password recovery retain the invitation destination. Verification happens inside the invitation screen; wrong-account and unavailable-invitation states offer recovery. The email remains verified and email-bound at acceptance. Additional homes do not inherit owner permissions or existing bill allocations.
+
+## Confirmed roommate activity
+
+The dashboard can interpret a roommate contribution such as “Allie paid $50 toward electricity,” clarify the person/bill, and show a proposal before recording anything. Migration `0004_partial_contributions.sql` adds partial contributions while preserving manual settlement and individual reversals. Apply this reviewed migration before deploying the updated queries.
+
+Configure server-only `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` to enable interpretation. The AI never authorizes or performs financial mutations. See [the architecture, limits, migration and test instructions](docs/ACTIVITY-CHAT.md). Provider payments are outside this feature.

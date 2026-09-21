@@ -34,7 +34,8 @@ A household bill tracker, not a payments platform. Use pnpm; TypeScript strict m
 - `lib/db/`: Drizzle schema, pooled node-postgres connection. Migration SQL in `drizzle/`.
 - `lib/server/auth.ts`: lazy managed Neon Auth integration; session read bypasses cookie cache for authorization.
 - `lib/server/households.ts`: tenant transaction boundary, onboarding, invitations.
-- `lib/server/bills.ts`: atomic bill/template/payment mutations.
+- `lib/server/bills.ts`: atomic bill/template/payment mutations; shared transaction helpers for create-and-contribute.
+- `lib/domain/activity.ts` + `lib/server/activity*.ts`: deterministic activity resolution, signed proposals, bounded interpretation, and atomic idempotent confirmation.
 - `lib/server/recurrence.ts`: shared idempotent generation, authenticated lazy trigger and cron.
 - `lib/server/queries.ts`: consistent-snapshot tenant reads, no framework auth dependencies.
 - `lib/server/current.ts`: React request memoization and authenticated route context.
@@ -50,15 +51,15 @@ A household bill tracker, not a payments platform. Use pnpm; TypeScript strict m
 2. Every tenant service uses `inHousehold` and scopes ALL resource IDs by household. Roles are owner/member. Owners manage invitations/settings/templates; members record only their own shares; creators/owners edit unpaid bills.
 3. Store cents as integers. Parse decimal strings, never `parseFloat(value) * 100`. Custom sums must equal bill totals. Equal split sorts member UUIDs before distributing leftover cents.
 4. Calendar due dates are Postgres DATE, formatted without local JS timezone conversion. Overdue starts after the due date in the household IANA zone. UTC timestamps are for event history.
-5. No paid boolean on bills. Payments settle individual splits. Reversals retain original rows. An old undo action must not reverse a newer payment.
+5. No paid boolean on bills. Payments are positive partial contributions toward individual splits; sum non-reversed rows and never exceed the share. Omitted manual amounts settle the remaining share. Reversals retain original rows. An old undo action must not reverse a newer payment.
 6. Bill lock serializes financial edits and payment mutations. No financial editing once ANY payment history exists, including reversed payments. Version numbers prevent stale edits.
 7. Monthly templates never update generated bills. Preserve the anchor day through short months. Unique template/period and row locks make generation idempotent. Resume skips missed paused periods. Catch-up is bounded to 24 instances per template per invocation.
-8. Composite tenant foreign keys and deferred balance triggers are part of the schema. Keep custom migration `0002_financial_invariants.sql` when regenerating. Keep migration `0003_pretty_wraith.sql`, which replaces the single-household uniqueness constraint with `(household_id, user_id)` and adds a user index. Test migrations against development first.
+8. Composite tenant foreign keys and deferred balance triggers are part of the schema. Keep custom migration `0002_financial_invariants.sql` when regenerating. Keep migration `0003_pretty_wraith.sql`, which replaces the single-household uniqueness constraint with `(household_id, user_id)` and adds a user index. Keep `0004_partial_contributions.sql`, including its aggregate payment and immutable-share triggers. Test migrations against development first.
 9. Invitation tokens are 256-bit random, stored hashed, seven-day expiry, email-bound, owner-issued, revocable, transactionally consumed. Verified email required for acceptance.
 10. No secrets, real user data, test credentials, or auth bypasses in tracked files. Test SQL verification applies ONLY to generated reserved example.com accounts on the designated development branch.
 11. Existing profile IDs mirror Neon auth IDs; Neon owns the `neon_auth` schema. Do not migrate provider-managed tables. Household membership is the authorization source of truth.
 12. Transactions set `app.user_id` and `app.household_id` for future RLS. System cron is the explicit exception and requires constant-time bearer-secret validation. RLS is not enabled yet.
-13. No Stripe, bank connections, AI, payment transfers, Redux, or organization framework. Keep dependencies product-focused.
+13. No Stripe, bank connections, payment transfers, Redux, or organization framework. AI is limited to the explicitly confirmed roommate activity interpreter described in `docs/ACTIVITY-CHAT.md`; it has no financial or authorization authority. Keep dependencies product-focused.
 
 ## Verification and deployment
 

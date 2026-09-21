@@ -15,6 +15,9 @@ import {
   revokeInvitation,
 } from "@/lib/server/households";
 import { saveBill, recordPayment, updateTemplate } from "@/lib/server/bills";
+import { prepareActivity, confirmActivity } from "@/lib/server/activity";
+import { signActivity, verifyActivity } from "@/lib/server/activity-token";
+import type { ActivityIntent } from "@/lib/domain/activity";
 import { readHousehold } from "@/lib/server/queries";
 import { generateInTransaction } from "@/lib/server/recurrence";
 import type { Identity } from "@/lib/server/auth";
@@ -376,6 +379,386 @@ describe.skipIf(!enabled)(
       await expect(
         acceptInvitation(pendingUser, fresh.split("/").at(-1)!),
       ).rejects.toThrow();
+    });
+
+    const activityIntent = (
+      overrides: Partial<ActivityIntent> = {},
+    ): ActivityIntent => ({
+      intent: "contribution",
+      payer: "I",
+      amount: "10",
+      bill: "Activity internet",
+      category: "Internet",
+      total: null,
+      dueDate: null,
+      period: null,
+      household: null,
+      incomplete: false,
+      ...overrides,
+    });
+    const freshBill = async () => {
+      const name = `Activity ${randomUUID()}`;
+      const id = await saveBill(
+        owner,
+        householdId,
+        input({ name, amount: "100.00", category: "Internet" }),
+      );
+      const bill = (await readHousehold(owner, householdId)).bills.find(
+        (b) => b.id === id,
+      )!;
+      return {
+        bill,
+        own: bill.splits.find((s) => s.memberId === ownerMember)!,
+        other: bill.splits.find((s) => s.memberId === roommateMember)!,
+      };
+    };
+    it("supports partial + partial + manual remaining, individual reversal and replacement", async () => {
+      const { bill, own, other } = await freshBill();
+      await recordPayment(owner, householdId, bill.id, own.id, undefined, 1000);
+      await recordPayment(owner, householdId, bill.id, own.id, undefined, 1500);
+      let data = await readHousehold(owner, householdId);
+      let share = data.bills
+        .find((b) => b.id === bill.id)!
+        .splits.find((s) => s.id === own.id)!;
+      expect(share.paidCents).toBe(2500);
+      expect(share.activePaymentCount).toBe(2);
+      const firstPayment = data.payments.find(
+        (p) => p.billId === bill.id && p.amountCents === 1000,
+      )!;
+      await recordPayment(owner, householdId, bill.id, own.id, firstPayment.id);
+      data = await readHousehold(owner, householdId);
+      expect(data.bills.find((b) => b.id === bill.id)!.paidCents).toBe(1500);
+      await recordPayment(owner, householdId, bill.id, own.id, undefined, 500);
+      await recordPayment(owner, householdId, bill.id, own.id);
+      data = await readHousehold(owner, householdId);
+      share = data.bills
+        .find((b) => b.id === bill.id)!
+        .splits.find((s) => s.id === own.id)!;
+      expect(share.paidCents).toBe(5000);
+      expect(share.activePaymentCount).toBe(3);
+      expect(
+        data.payments.filter((p) => p.billId === bill.id && p.reversedAt),
+      ).toHaveLength(1);
+      await recordPayment(
+        roommate,
+        householdId,
+        bill.id,
+        other.id,
+        undefined,
+        2000,
+      );
+      await recordPayment(
+        roommate,
+        householdId,
+        bill.id,
+        other.id,
+        undefined,
+        3000,
+      );
+      expect(
+        (await readHousehold(owner, householdId)).bills.find(
+          (b) => b.id === bill.id,
+        )!.status,
+      ).toBe("paid");
+      await expect(
+        recordPayment(owner, householdId, bill.id, own.id, undefined, 1),
+      ).rejects.toThrow("remaining");
+      await expect(
+        saveBill(owner, householdId, input(), { id: bill.id, version: 1 }),
+      ).rejects.toThrow("history");
+    });
+    it("rejects nonpositive/fractional and excess contributions, permits owners and enforces own-share permissions", async () => {
+      const { bill, own, other } = await freshBill();
+      for (const amount of [0, -1, 1.5, 5001])
+        await expect(
+          recordPayment(owner, householdId, bill.id, own.id, undefined, amount),
+        ).rejects.toThrow();
+      await expect(
+        recordPayment(roommate, householdId, bill.id, own.id, undefined, 100),
+      ).rejects.toThrow("own share");
+      await recordPayment(
+        owner,
+        householdId,
+        bill.id,
+        other.id,
+        undefined,
+        100,
+      );
+      await expect(
+        recordPayment(
+          outsider,
+          otherHousehold,
+          bill.id,
+          own.id,
+          undefined,
+          100,
+        ),
+      ).rejects.toThrow("Bill not found");
+      expect(
+        (await readHousehold(owner, householdId)).bills.find(
+          (b) => b.id === bill.id,
+        )!.paidCents,
+      ).toBe(100);
+    });
+    it("serializes concurrent +30/+30 with only $50 remaining", async () => {
+      const { bill, own } = await freshBill();
+      const results = await Promise.allSettled([
+        recordPayment(owner, householdId, bill.id, own.id, undefined, 3000),
+        recordPayment(owner, householdId, bill.id, own.id, undefined, 3000),
+      ]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const data = await readHousehold(owner, householdId);
+      expect(data.bills.find((b) => b.id === bill.id)!.paidCents).toBe(3000);
+      expect(data.payments.filter((p) => p.billId === bill.id)).toHaveLength(1);
+    });
+    it("DB trigger rejects concurrent raw overpayments and immutable-history updates", async () => {
+      const { bill, own } = await freshBill();
+      const insert = () =>
+        getDb().transaction(async (tx) => {
+          await tx.insert(schema.payments).values({
+            householdId,
+            splitId: own.id,
+            recordedBy: owner.id,
+            amountCents: 3000,
+          });
+          await tx.execute(sql`select pg_sleep(0.15)`);
+        });
+      const results = await Promise.allSettled([insert(), insert()]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const data = await readHousehold(owner, householdId);
+      const payment = data.payments.find((p) => p.billId === bill.id)!;
+      expect(data.bills.find((b) => b.id === bill.id)!.paidCents).toBe(3000);
+      await expect(
+        getDb()
+          .update(schema.payments)
+          .set({ amountCents: 1 })
+          .where(eq(schema.payments.id, payment.id)),
+      ).rejects.toThrow();
+      await expect(
+        getDb()
+          .update(schema.splits)
+          .set({ amountCents: 2000 })
+          .where(eq(schema.splits.id, own.id)),
+      ).rejects.toThrow();
+    });
+    it("confirms an existing bill exactly once, including concurrent retries and replay after reversal", async () => {
+      const { bill, own } = await freshBill();
+      const reply = prepareActivity(
+        owner,
+        await readHousehold(owner, householdId),
+        activityIntent({ bill: bill.name }),
+        [],
+      );
+      expect(reply.kind).toBe("proposal");
+      const results = await Promise.all([
+        confirmActivity(owner, householdId, reply.token!),
+        confirmActivity(owner, householdId, reply.token!),
+      ]);
+      expect(results.every((r) => r.kind === "success")).toBe(true);
+      expect(
+        results.filter((r) => r.message.includes("already recorded")),
+      ).toHaveLength(1);
+      let data = await readHousehold(owner, householdId);
+      const expired = signActivity({
+        ...verifyActivity(reply.token!, owner.id, householdId),
+        expires: 0,
+      });
+      expect(
+        (await confirmActivity(owner, householdId, expired)).message,
+      ).toContain("already recorded");
+      expect(data.payments.filter((p) => p.billId === bill.id)).toHaveLength(1);
+      const payment = data.payments.find((p) => p.billId === bill.id)!;
+      await recordPayment(owner, householdId, bill.id, own.id, payment.id);
+      expect(
+        (await confirmActivity(owner, householdId, reply.token!)).message,
+      ).toContain("reversed");
+      data = await readHousehold(owner, householdId);
+      expect(data.bills.find((b) => b.id === bill.id)!.paidCents).toBe(0);
+    });
+    it("requires confirmation again after any bill state changes", async () => {
+      const { bill, own } = await freshBill();
+      const reply = prepareActivity(
+        owner,
+        await readHousehold(owner, householdId),
+        activityIntent({ bill: bill.name }),
+        [],
+      );
+      await recordPayment(owner, householdId, bill.id, own.id, undefined, 500);
+      const refreshed = await confirmActivity(owner, householdId, reply.token!);
+      expect(refreshed.kind).toBe("proposal");
+      expect(refreshed.message).toContain("changed");
+      expect(refreshed.proposal?.remainingCents).toBe(3500);
+      expect(
+        (await readHousehold(owner, householdId)).bills.find(
+          (b) => b.id === bill.id,
+        )!.paidCents,
+      ).toBe(500);
+      expect(
+        (await confirmActivity(owner, householdId, refreshed.token!)).kind,
+      ).toBe("success");
+      const editBill = await freshBill();
+      const editProposal = prepareActivity(
+        owner,
+        await readHousehold(owner, householdId),
+        activityIntent({ bill: editBill.bill.name }),
+        [],
+      );
+      await saveBill(
+        owner,
+        householdId,
+        input({
+          name: editBill.bill.name,
+          amount: "120",
+          category: "Internet",
+        }),
+        { id: editBill.bill.id, version: 1 },
+      );
+      expect(
+        (await confirmActivity(owner, householdId, editProposal.token!)).kind,
+      ).toBe("proposal");
+    });
+    it("creates an equal-split one-time bill and contribution atomically, once under concurrent replay", async () => {
+      const name = `Brand new ${randomUUID()}`;
+      const data = await readHousehold(owner, householdId);
+      const reply = prepareActivity(
+        owner,
+        data,
+        activityIntent({
+          bill: name,
+          category: "Other",
+          total: "100.01",
+          dueDate: "2028-02-28",
+        }),
+        [],
+      );
+      const before = data.bills.length;
+      const results = await Promise.all([
+        confirmActivity(owner, householdId, reply.token!),
+        confirmActivity(owner, householdId, reply.token!),
+      ]);
+      expect(results.some((r) => r.message.startsWith("Created"))).toBe(true);
+      const after = await readHousehold(owner, householdId);
+      expect(after.bills).toHaveLength(before + 1);
+      const bill = after.bills.find((b) => b.name === name)!;
+      expect(bill.templateId).toBeNull();
+      expect(bill.paidCents).toBe(1000);
+      expect(bill.splits.map((s) => s.amountCents).sort()).toEqual([
+        5000, 5001,
+      ]);
+      expect(after.payments.filter((p) => p.billId === bill.id)).toHaveLength(
+        1,
+      );
+    });
+    it("rolls back the newly created bill when contribution insertion fails", async () => {
+      const name = `Rollback ${randomUUID()}`;
+      const reply = prepareActivity(
+        owner,
+        await readHousehold(owner, householdId),
+        activityIntent({
+          bill: name,
+          category: "Other",
+          total: "100.00",
+          dueDate: "2028-02-28",
+        }),
+        [],
+      );
+      const context = verifyActivity(reply.token!, owner.id, householdId);
+      // Force the unique-index backstop to fail after bill+splits creation. A
+      // different tenant's command must neither replay nor expose that bill.
+      const otherId = await saveBill(
+        outsider,
+        otherHousehold,
+        input({ memberIds: [outsiderMember] }),
+      );
+      const other = (await readHousehold(outsider, otherHousehold)).bills.find(
+        (b) => b.id === otherId,
+      )!;
+      await getDb().insert(schema.payments).values({
+        householdId: otherHousehold,
+        splitId: other.splits[0].id,
+        amountCents: 1,
+        recordedBy: outsider.id,
+        sourceCommandId: context.commandId,
+      });
+      await expect(
+        confirmActivity(owner, householdId, reply.token!),
+      ).rejects.toThrow();
+      expect(
+        (await readHousehold(owner, householdId)).bills.some(
+          (b) => b.name === name,
+        ),
+      ).toBe(false);
+      await expect(
+        confirmActivity(owner, otherHousehold, reply.token!),
+      ).rejects.toThrow("household changed");
+      await expect(
+        confirmActivity(roommate, householdId, reply.token!),
+      ).rejects.toThrow("household changed");
+    });
+    it("refuses historical shares and refreshes a new bill after membership changes", async () => {
+      const { bill } = await freshBill();
+      const name = `Membership ${randomUUID()}`;
+      const reply = prepareActivity(
+        owner,
+        await readHousehold(owner, householdId),
+        activityIntent({
+          bill: name,
+          category: "Other",
+          total: "120",
+          dueDate: "2028-02-28",
+        }),
+        [],
+      );
+      // pendingUser is already a reserved test fixture and cleaned up below.
+      const url = await inviteMember(owner, householdId, {
+        email: pendingUser.email,
+      });
+      await acceptInvitation(pendingUser, url.split("/").at(-1)!);
+      const refreshed = await confirmActivity(owner, householdId, reply.token!);
+      expect(refreshed.kind).toBe("proposal");
+      expect(refreshed.proposal?.allocations).toHaveLength(3);
+      expect(
+        (await readHousehold(owner, householdId)).bills.some(
+          (b) => b.name === name,
+        ),
+      ).toBe(false);
+      const historical = prepareActivity(
+        owner,
+        await readHousehold(owner, householdId),
+        activityIntent({ bill: bill.name, payer: pendingUser.name }),
+        [],
+      );
+      expect(historical.kind).toBe("clarification");
+      expect(historical.message).toContain("does not have a share");
+      expect(
+        (await confirmActivity(owner, householdId, refreshed.token!)).message,
+      ).toContain("Created");
+      // Restore membership so the existing multi-home invitation test retains
+      // its original preconditions. This member has shares in the new bill,
+      // so remove only that test bill's records first within one transaction.
+      const created = (await readHousehold(owner, householdId)).bills.find(
+        (b) => b.name === name,
+      )!;
+      await getDb().transaction(async (tx) => {
+        await tx.delete(schema.payments).where(
+          inArray(
+            schema.payments.splitId,
+            created.splits.map((s) => s.id),
+          ),
+        );
+        await tx
+          .delete(schema.splits)
+          .where(eq(schema.splits.billId, created.id));
+        await tx.delete(schema.bills).where(eq(schema.bills.id, created.id));
+        await tx
+          .delete(schema.members)
+          .where(
+            and(
+              eq(schema.members.householdId, householdId),
+              eq(schema.members.userId, pendingUser.id),
+            ),
+          );
+      });
     });
     it("supports multiple homes, scoped roles, repeat acceptance and tenant-safe lookups", async () => {
       for (const name of ["Pending user home", "Pending user second home"]) {

@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { billStatus, todayInZone, type Category } from "@/lib/domain/bills";
 import type { HouseholdData } from "@/lib/domain/types";
+import type { Transaction } from "@/lib/db";
 import type { Identity } from "./auth";
 import { inHousehold } from "./households";
 export async function readHousehold(
@@ -21,115 +22,114 @@ export async function readHousehold(
   return inHousehold(
     user,
     householdId,
-    async (tx, actor) => {
-      const [household] = await tx
-        .select()
-        .from(households)
-        .where(eq(households.id, householdId));
-      const people = await tx
-        .select({
-          id: members.id,
-          userId: members.userId,
-          role: members.role,
-          name: profiles.name,
-          email: profiles.email,
-        })
-        .from(members)
-        .innerJoin(profiles, eq(members.userId, profiles.id))
-        .where(eq(members.householdId, householdId))
-        .orderBy(asc(members.createdAt));
-      const rows = await tx
-        .select()
-        .from(bills)
-        .where(eq(bills.householdId, householdId))
-        .orderBy(desc(bills.dueDate));
-      const shares = await tx
-        .select()
-        .from(splits)
-        .where(eq(splits.householdId, householdId));
-      const records = await tx
-        .select()
-        .from(payments)
-        .where(eq(payments.householdId, householdId))
-        .orderBy(desc(payments.recordedAt));
-      const rules = await tx
-        .select()
-        .from(templates)
-        .where(eq(templates.householdId, householdId))
-        .orderBy(asc(templates.nextDueDate));
-      const allocations = await tx
-        .select()
-        .from(templateSplits)
-        .where(eq(templateSplits.householdId, householdId));
-      const today = todayInZone(household.timeZone);
-      const memberMap = new Map(people.map((p) => [p.id, p]));
-      const shareMap = new Map(shares.map((s) => [s.id, s]));
-      const billMap = new Map(rows.map((b) => [b.id, b]));
-      const peopleByUser = new Map(people.map((p) => [p.userId, p]));
-      const sharesByBill = Map.groupBy(shares, (s) => s.billId);
-      const allocationsByTemplate = Map.groupBy(
-        allocations,
-        (a) => a.templateId,
-      );
-      const activePaymentBySplit = new Map(
-        records.filter((p) => !p.reversedAt).map((p) => [p.splitId, p]),
-      );
-      const billsWithHistory = new Set(
-        records.map((p) => shareMap.get(p.splitId)!.billId),
-      );
-      return {
-        household,
-        today,
-        members: people,
-        viewer: people.find((p) => p.id === actor.id)!,
-        bills: rows.map((bill) => {
-          const billShares = (sharesByBill.get(bill.id) || []).map((share) => {
-            const payment = activePaymentBySplit.get(share.id);
-            return {
-              ...share,
-              name: memberMap.get(share.memberId)!.name,
-              paidCents: payment?.amountCents || 0,
-              paymentId: payment?.id || null,
-            };
-          });
-          const paidCents = billShares.reduce((sum, s) => sum + s.paidCents, 0);
-          return {
-            ...bill,
-            category: bill.category as Category,
-            paidCents,
-            status: billStatus(
-              bill.amountCents,
-              paidCents,
-              bill.dueDate,
-              today,
-            ),
-            splits: billShares,
-            hasPaymentHistory: billsWithHistory.has(bill.id),
-          };
-        }),
-        payments: records.map((p) => {
-          const share = shareMap.get(p.splitId)!;
-          const bill = billMap.get(share.billId)!;
-          return {
-            ...p,
-            recordedAt: p.recordedAt.toISOString(),
-            reversedAt: p.reversedAt?.toISOString() || null,
-            memberName: memberMap.get(share.memberId)!.name,
-            billName: bill.name,
-            billId: bill.id,
-            recordedByName: peopleByUser.get(p.recordedBy)?.name || "Roommate",
-          };
-        }),
-        templates: rules.map((t) => ({
-          ...t,
-          category: t.category as Category,
-          allocations: (allocationsByTemplate.get(t.id) || []).map((a) => ({
-            memberId: a.memberId,
-            amountCents: a.amountCents,
-          })),
-        })),
-      };
-    },
+    (tx, actor) => readHouseholdInTransaction(tx, householdId, actor.id),
     { snapshot: true },
   );
+}
+export async function readHouseholdInTransaction(
+  tx: Transaction,
+  householdId: string,
+  actorId: string,
+): Promise<HouseholdData> {
+  const [household] = await tx
+    .select()
+    .from(households)
+    .where(eq(households.id, householdId));
+  const people = await tx
+    .select({
+      id: members.id,
+      userId: members.userId,
+      role: members.role,
+      name: profiles.name,
+      email: profiles.email,
+    })
+    .from(members)
+    .innerJoin(profiles, eq(members.userId, profiles.id))
+    .where(eq(members.householdId, householdId))
+    .orderBy(asc(members.createdAt));
+  const rows = await tx
+    .select()
+    .from(bills)
+    .where(eq(bills.householdId, householdId))
+    .orderBy(desc(bills.dueDate));
+  const shares = await tx
+    .select()
+    .from(splits)
+    .where(eq(splits.householdId, householdId));
+  const records = await tx
+    .select()
+    .from(payments)
+    .where(eq(payments.householdId, householdId))
+    .orderBy(desc(payments.recordedAt), desc(payments.id));
+  const rules = await tx
+    .select()
+    .from(templates)
+    .where(eq(templates.householdId, householdId))
+    .orderBy(asc(templates.nextDueDate));
+  const allocations = await tx
+    .select()
+    .from(templateSplits)
+    .where(eq(templateSplits.householdId, householdId));
+  const today = todayInZone(household.timeZone);
+  const memberMap = new Map(people.map((p) => [p.id, p]));
+  const shareMap = new Map(shares.map((s) => [s.id, s]));
+  const billMap = new Map(rows.map((b) => [b.id, b]));
+  const peopleByUser = new Map(people.map((p) => [p.userId, p]));
+  const sharesByBill = Map.groupBy(shares, (s) => s.billId);
+  const allocationsByTemplate = Map.groupBy(allocations, (a) => a.templateId);
+  const activePaymentsBySplit = Map.groupBy(
+    records.filter((p) => !p.reversedAt),
+    (p) => p.splitId,
+  );
+  const billsWithHistory = new Set(
+    records.map((p) => shareMap.get(p.splitId)!.billId),
+  );
+  return {
+    household,
+    today,
+    members: people,
+    viewer: people.find((p) => p.id === actorId)!,
+    bills: rows.map((bill) => {
+      const billShares = (sharesByBill.get(bill.id) || []).map((share) => {
+        const contributions = activePaymentsBySplit.get(share.id) || [];
+        return {
+          ...share,
+          name: memberMap.get(share.memberId)!.name,
+          paidCents: contributions.reduce((sum, p) => sum + p.amountCents, 0),
+          paymentId: contributions[0]?.id || null,
+          activePaymentCount: contributions.length,
+        };
+      });
+      const paidCents = billShares.reduce((sum, s) => sum + s.paidCents, 0);
+      return {
+        ...bill,
+        category: bill.category as Category,
+        paidCents,
+        status: billStatus(bill.amountCents, paidCents, bill.dueDate, today),
+        splits: billShares,
+        hasPaymentHistory: billsWithHistory.has(bill.id),
+      };
+    }),
+    payments: records.map((p) => {
+      const share = shareMap.get(p.splitId)!;
+      const bill = billMap.get(share.billId)!;
+      return {
+        ...p,
+        recordedAt: p.recordedAt.toISOString(),
+        reversedAt: p.reversedAt?.toISOString() || null,
+        memberName: memberMap.get(share.memberId)!.name,
+        billName: bill.name,
+        billId: bill.id,
+        recordedByName: peopleByUser.get(p.recordedBy)?.name || "Roommate",
+      };
+    }),
+    templates: rules.map((t) => ({
+      ...t,
+      category: t.category as Category,
+      allocations: (allocationsByTemplate.get(t.id) || []).map((a) => ({
+        memberId: a.memberId,
+        amountCents: a.amountCents,
+      })),
+    })),
+  };
 }
