@@ -36,6 +36,13 @@
       "when": 1790001588448,
       "tag": "0004_partial_contributions",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790009739525,
+      "tag": "0005_kind_jocasta",
+      "breakpoints": true
     }
   ]
 }

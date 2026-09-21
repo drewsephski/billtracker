@@ -1,4 +1,5 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
+import { continueChatActivity } from "@/lib/server/chat-activity";
 import { z } from "zod";
 import {
   activeActivityContext,
@@ -39,7 +40,27 @@ const requestSchema = z.object({
 });
 export async function POST(request: Request) {
   try {
-    const body = requestSchema.parse(await activityBody(request));
+    const raw = await activityBody(request);
+    if (raw && typeof raw === "object" && "chatMessageId" in raw) {
+      const body = z
+        .strictObject({
+          householdId: z.uuid(),
+          chatMessageId: z.uuid(),
+          text: z.string().trim().min(1).max(1000).optional(),
+          choice: z.number().int().min(0).max(1000).optional(),
+          cancel: z.boolean().optional(),
+          refresh: z.boolean().optional(),
+          clientKey: z.uuid().optional(),
+        })
+        .parse(raw);
+      const { user, householdId } = await activeActivityContext(
+        body.householdId,
+      );
+      return Response.json(
+        await continueChatActivity(user, householdId, body.chatMessageId, body),
+      );
+    }
+    const body = requestSchema.parse(raw);
     const { user, householdId } = await activeActivityContext(body.householdId);
     const data = await readHousehold(user, householdId);
     const prior = body.token

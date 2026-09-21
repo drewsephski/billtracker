@@ -13,7 +13,30 @@ import {
 import { DomainError } from "@/lib/domain/bills";
 
 export function redactActivityText(text: string) {
+  for (const key of [
+    "OPENROUTER_API_KEY",
+    "AI_PROPOSAL_SECRET",
+    "NEON_AUTH_COOKIE_SECRET",
+    "DATABASE_URL",
+    "DATABASE_URL_UNPOOLED",
+  ]) {
+    const value = process.env[key];
+    if (value && value.length > 8)
+      text = text.split(value).join("[secret omitted]");
+  }
   return text
+    .replace(
+      /\b(?:sk-[a-z0-9_-]{12,}|Bearer\s+[a-z0-9._-]{12,})/gi,
+      "[secret omitted]",
+    )
+    .replace(
+      /\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\b/g,
+      "[auth omitted]",
+    )
+    .replace(
+      /\b(?:password|secret|api[_ -]?key|access[_ -]?token)\s*[:=]\s*[^\s,;]+/gi,
+      "[credential omitted]",
+    )
     .replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, "[email omitted]")
     .replace(
       /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,

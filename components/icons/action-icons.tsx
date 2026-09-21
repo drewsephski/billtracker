@@ -3,6 +3,7 @@ import { forwardRef, useImperativeHandle } from "react";
 import { motion, useAnimation } from "motion/react";
 import {
   Copy,
+  MessageCircle,
   Eye,
   EyeOff,
   LogOut,
@@ -54,6 +55,7 @@ function actionIcon(
   return ActionIcon;
 }
 export const actionIcons = {
+  "message-circle": actionIcon(MessageCircle),
   copy: actionIcon(Copy),
   share: actionIcon(Share2),
   eye: actionIcon(Eye),

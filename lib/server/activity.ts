@@ -1,4 +1,5 @@
 import "server-only";
+import type { Transaction } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { bills, households, members, payments, splits } from "@/lib/db/schema";
@@ -108,6 +109,7 @@ export async function confirmActivity(
   user: Identity,
   activeHouseholdId: string,
   token: string,
+  onResult?: (tx: Transaction, result: ActivityReply) => Promise<void>,
 ): Promise<ActivityReply> {
   const context = verifyActivity(token, user.id, activeHouseholdId, {
     allowExpired: true,
@@ -116,6 +118,10 @@ export async function confirmActivity(
     throw new DomainError("There is no contribution ready to confirm.");
   const expected = context.resolution.proposal;
   return inHousehold(user, activeHouseholdId, async (tx, actor) => {
+    const finish = async (result: ActivityReply) => {
+      await onResult?.(tx, result);
+      return result;
+    };
     // Serialize retries BEFORE creating anything. The ledger unique index is a
     // second backstop; rollback includes a newly created bill and its splits.
     await tx.execute(
@@ -143,11 +149,11 @@ export async function confirmActivity(
         !canManageShare(actor.role, actor.id, previous.share.memberId)
       )
         throw new DomainError("You can only update your own share.");
-      return {
+      return finish({
         kind: "success",
         message: `This previously confirmed activity was already recorded.${previous.payment.reversedAt ? " Its contribution has since been reversed." : ""}`,
         billUrl: `/bills/${previous.share.billId}`,
-      };
+      });
     }
     if (context.expires < Date.now())
       throw new DomainError(
@@ -195,7 +201,7 @@ export async function confirmActivity(
       current.kind !== "proposal" ||
       JSON.stringify(current.proposal) !== JSON.stringify(expected)
     )
-      return refreshed(context, current);
+      return finish(refreshed(context, current));
     const proposal = current.proposal;
     let billId = proposal.billId;
     let splitId = proposal.splitId;
@@ -243,13 +249,13 @@ export async function confirmActivity(
         sourceCreatedBill: proposal.kind === "new",
       },
     );
-    return {
+    return finish({
       kind: "success",
       message:
         proposal.kind === "new"
           ? `Created ${proposal.name} for ${money(proposal.totalCents)} due ${proposal.dueDate}, split it across ${proposal.allocations.length} roommates, and recorded ${proposal.payerName}’s ${money(proposal.amountCents)} contribution.`
           : `Updated ${proposal.name}. Recorded ${money(proposal.amountCents)} from ${proposal.payerName}. They have ${money(proposal.remainingCents)} left on their share.`,
       billUrl: `/bills/${billId}`,
-    };
+    });
   });
 }

@@ -13,6 +13,7 @@ export default async function Page() {
   const homes = await householdsFor(user);
   return (
     <PublicShell
+      variant="home"
       title={
         homes.length ? "Make room for another home." : "What do you call home?"
       }

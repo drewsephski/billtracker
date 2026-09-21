@@ -24,6 +24,7 @@ import { signOut } from "@/lib/server/actions";
 import type { HouseholdData } from "@/lib/domain/types";
 const links = [
   { href: "/dashboard", label: "Home", icon: "home" },
+  { href: "/chat", label: "Chat", icon: "message-circle" },
   { href: "/bills", label: "Bills", icon: "receipt-text" },
   { href: "/household", label: "Household", icon: "users" },
   { href: "/settings", label: "Settings", icon: "settings" },
@@ -46,7 +47,10 @@ export function AppShell({
     path === `${prefix}${href}` ||
     (href === "/bills" && path.startsWith(`${prefix}/bills/`)) ||
     (demo && path === "/demo" && href === "/dashboard");
-  const nav = links.map(({ href, label, icon }) => (
+  const visibleLinks = demo
+    ? links.filter((link) => link.href !== "/chat")
+    : links;
+  const nav = visibleLinks.map(({ href, label, icon }) => (
     <Button
       key={href}
       variant={active(href) ? "secondary" : "ghost"}
@@ -170,7 +174,11 @@ export function AppShell({
         )}
         <main
           id="main-content"
-          className="mx-auto flex w-full max-w-6xl px-5 pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-9 sm:pt-10 lg:pb-10"
+          className={
+            path === "/chat"
+              ? "mx-auto flex w-full max-w-4xl px-2 pt-2 sm:px-9 sm:pt-4"
+              : "mx-auto flex w-full max-w-6xl px-5 pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-9 sm:pt-10 lg:pb-10"
+          }
         >
           <Reveal
             key={path}
@@ -182,9 +190,9 @@ export function AppShell({
       </div>
       <nav
         aria-label="Mobile navigation"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 gap-1 border-t border-border/70 bg-card/95 px-3 pt-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden"
+        className={`fixed inset-x-0 bottom-0 z-30 grid ${demo ? "grid-cols-4" : "grid-cols-5"} gap-1 border-t border-border/70 bg-card/95 px-3 pt-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden`}
       >
-        {links.map(({ href, label, icon }) => (
+        {visibleLinks.map(({ href, label, icon }) => (
           <Button
             key={href}
             asChild

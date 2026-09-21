@@ -1,5 +1,6 @@
 node_modules
 .next
+.next-chat
 pnpm-lock.yaml
 drizzle/meta
 playwright-report

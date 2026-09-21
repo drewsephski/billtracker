@@ -9,13 +9,13 @@ import { DomainError } from "@/lib/domain/bills";
 import { requireUser } from "./auth";
 import { householdsFor } from "./households";
 // Chat must not lazily generate recurring bills while interpreting a message.
-export async function activeActivityContext(expectedHousehold: string) {
+export async function activeActivityContext(expectedHousehold?: string) {
   const user = await requireUser();
   const household = selectHousehold(
     await householdsFor(user),
     (await cookies()).get(ACTIVE_HOUSEHOLD_COOKIE)?.value,
   );
-  if (!household || household.id !== expectedHousehold)
+  if (!household || (expectedHousehold && household.id !== expectedHousehold))
     throw new DomainError(
       "Your active household changed. Start this activity again in the selected household.",
     );

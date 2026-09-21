@@ -43,7 +43,7 @@ export function Feedback({ state }: { state: ActionResult }) {
         <AlertDescription className="flex items-center gap-3">
           <span className="flex-1">{state.error || state.success}</span>
           {state.success && !state.error && (
-            <Blob className="size-10 shrink-0" />
+            <Blob variant="chat" sizes="40px" className="size-10 shrink-0" />
           )}
         </AlertDescription>
       </Alert>

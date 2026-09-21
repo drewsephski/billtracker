@@ -1,4 +1,26 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  sendChat,
+  listChat,
+  processChat,
+  recoverChat,
+} from "@/lib/server/chat";
+import {
+  confirmChatActivity,
+  continueChatActivity,
+} from "@/lib/server/chat-activity";
+const chatAI = vi.hoisted(() => ({
+  triage: vi.fn(),
+  answer: vi.fn(),
+  interpret: vi.fn(),
+}));
+vi.mock("@/lib/server/chat-ai", () => ({
+  triageChat: chatAI.triage,
+  answerChat: chatAI.answer,
+}));
+vi.mock("@/lib/server/activity-interpreter", () => ({
+  interpretActivity: chatAI.interpret,
+}));
 import { loadEnvConfig } from "@next/env";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -96,12 +118,189 @@ describe.skipIf(!enabled)(
       roommateMember = (await membershipFor(roommate, householdId))!.id;
       outsiderMember = (await membershipFor(outsider, otherHousehold))!.id;
     });
+    it("persists shared messages, stable retries, sender names and cursor pagination with strict isolation", async () => {
+      const key = randomUUID();
+      const sent = await Promise.all([
+        sendChat(owner, householdId, { text: "hello home", clientKey: key }),
+        sendChat(owner, householdId, { text: "hello home", clientKey: key }),
+      ]);
+      expect(sent[0].id).toBe(sent[1].id);
+      expect(
+        (await listChat(roommate, householdId)).messages.some(
+          (m) => m.id === sent[0].id,
+        ),
+      ).toBe(true);
+      await expect(
+        sendChat(roommate, householdId, { text: "hello home", clientKey: key }),
+      ).rejects.toThrow("send key");
+      await expect(listChat(outsider, householdId)).rejects.toThrow();
+      await expect(
+        sendChat(owner, otherHousehold, {
+          text: "leak",
+          clientKey: randomUUID(),
+        }),
+      ).rejects.toThrow();
+      expect(
+        (await listChat(outsider, otherHousehold, { watch: [sent[0].id] }))
+          .updates,
+      ).toEqual([]);
+      await getDb()
+        .insert(schema.chatMessages)
+        .values(
+          Array.from({ length: 45 }, (_, i) => ({
+            householdId,
+            senderId: roommateMember,
+            senderName: "Historical Roommate",
+            createdAt: new Date(Date.now() - 86400000),
+            kind: "human" as const,
+            text: `history ${i}`,
+            clientKey: randomUUID(),
+          })),
+        );
+      const latest = await listChat(owner, householdId);
+      expect(latest.messages).toHaveLength(40);
+      expect(latest.hasMore).toBe(true);
+      const older = await listChat(owner, householdId, {
+        before: latest.messages[0].cursor,
+      });
+      expect(older.messages).toHaveLength(6);
+      expect(older.hasMore).toBe(false);
+      const incremental = await listChat(owner, householdId, {
+        after: older.messages.at(-1)!.cursor,
+      });
+      expect(incremental.messages.map((m) => m.id)).toEqual(
+        latest.messages.map((m) => m.id),
+      );
+      expect(
+        new Set([...older.messages, ...latest.messages].map((m) => m.id)).size,
+      ).toBe(46);
+      expect(latest.messages[0].senderName).toBe("Historical Roommate");
+    });
+    it("processes each source once, recovers leases, stays silent and keeps human sends during provider failures", async () => {
+      chatAI.triage.mockResolvedValue("silent");
+      const silent = await sendChat(owner, householdId, {
+        text: "See you at dinner",
+        clientKey: randomUUID(),
+      });
+      await Promise.all([
+        processChat(owner, householdId, silent.id),
+        processChat(owner, householdId, silent.id),
+      ]);
+      expect(
+        (await listChat(owner, householdId)).messages.filter(
+          (m) => m.sourceId === silent.id,
+        ),
+      ).toHaveLength(0);
+      chatAI.triage.mockResolvedValue("answer");
+      chatAI.answer.mockResolvedValue("Internet is settled.");
+      const source = await sendChat(owner, householdId, {
+        text: "@Homeshare is internet settled?",
+        clientKey: randomUUID(),
+      });
+      await Promise.all([
+        processChat(owner, householdId, source.id),
+        processChat(owner, householdId, source.id),
+        processChat(roommate, householdId, source.id),
+      ]);
+      await processChat(owner, householdId, source.id);
+      expect(
+        (await listChat(owner, householdId)).messages.filter(
+          (m) => m.sourceId === source.id,
+        ),
+      ).toHaveLength(1);
+      chatAI.triage.mockRejectedValue(new Error("provider unavailable"));
+      const failed = await sendChat(roommate, householdId, {
+        text: "@Homeshare help",
+        clientKey: randomUUID(),
+      });
+      await getDb()
+        .update(schema.chatJobs)
+        .set({
+          state: "processing",
+          leaseUntil: new Date(0),
+          leaseId: randomUUID(),
+        })
+        .where(eq(schema.chatJobs.sourceId, failed.id));
+      await recoverChat(roommate, householdId);
+      const visible = (await listChat(owner, householdId)).messages;
+      expect(visible.some((m) => m.id === failed.id)).toBe(true);
+      expect(visible.filter((m) => m.sourceId === failed.id)).toHaveLength(1);
+    });
+    it("reuses activity proposals privately, restricts confirmation to source author and atomically publishes one result", async () => {
+      const billId = await saveBill(
+        owner,
+        householdId,
+        input({ name: "Chat Electricity" }),
+      );
+      chatAI.triage.mockResolvedValue("activity");
+      chatAI.interpret.mockResolvedValue({
+        intent: "contribution",
+        payer: "I",
+        amount: "10",
+        bill: "Chat Electricity",
+        category: "Electricity",
+        total: null,
+        dueDate: null,
+        period: null,
+        household: null,
+        incomplete: false,
+      });
+      const source = await sendChat(roommate, householdId, {
+        text: "I paid $10 toward Chat Electricity",
+        clientKey: randomUUID(),
+      });
+      await processChat(roommate, householdId, source.id);
+      expect(chatAI.interpret.mock.calls.at(-1)![0].history).toEqual([]);
+      const proposal = (await listChat(owner, householdId)).messages.find(
+        (m) => m.sourceId === source.id,
+      )!;
+      expect(proposal.reply?.proposal?.payerName).toBe(roommate.name);
+      expect(proposal.reply).not.toHaveProperty("token");
+      expect(proposal.actionable).toBe(true);
+      await expect(
+        confirmChatActivity(owner, householdId, proposal.id),
+      ).rejects.toThrow("Only the roommate");
+      await expect(
+        confirmChatActivity(outsider, otherHousehold, proposal.id),
+      ).rejects.toThrow();
+      await expect(
+        continueChatActivity(owner, householdId, proposal.id, { cancel: true }),
+      ).rejects.toThrow("Only the roommate");
+      const first = await confirmChatActivity(
+        roommate,
+        householdId,
+        proposal.id,
+      );
+      const retry = await confirmChatActivity(
+        roommate,
+        householdId,
+        proposal.id,
+      );
+      expect(first.kind).toBe("success");
+      expect(retry).toEqual(first);
+      expect(first.billUrl).toBe(`/bills/${billId}`);
+      const page = await listChat(owner, householdId, { watch: [proposal.id] });
+      expect(page.updates[0].actionable).toBe(false);
+      expect(
+        page.messages.filter(
+          (m) => m.sourceId === source.id && m.kind === "system",
+        ),
+      ).toHaveLength(1);
+      const data = await readHousehold(roommate, householdId);
+      expect(data.bills.find((b) => b.id === billId)!.paidCents).toBe(1000);
+    });
     afterAll(async () => {
       const ids = [householdId, otherHousehold, ...additionalHomes].filter(
         Boolean,
       );
       if (ids.length)
         await getDb().transaction(async (tx) => {
+          await tx
+            .delete(schema.chatJobs)
+            .where(inArray(schema.chatJobs.householdId, ids));
+          await tx
+            .delete(schema.chatMessages)
+            .where(inArray(schema.chatMessages.householdId, ids));
           await tx
             .delete(schema.payments)
             .where(inArray(schema.payments.householdId, ids));

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Heading, Text } from "@/components/ui/typography";
-import { ActivityChat } from "./activity-chat";
+
 import { GettingStarted } from "./getting-started";
 import { BillDialog } from "./bill-form";
 import { CategoryIcon, StatusBadge } from "./bill-card";
@@ -85,7 +85,12 @@ export function Dashboard({
               : "You’re all caught up. Make yourself at home."}
           </Text>
         </div>
-        <Blob priority className="w-full opacity-95 sm:row-span-2" />
+        <Blob
+          variant={ownRemaining ? "coins" : "chat"}
+          priority
+          sizes="(max-width: 640px) 28vw, 224px"
+          className="w-full sm:row-span-2"
+        />
         <Button
           asChild
           className="col-span-2 justify-self-start bg-foreground text-background hover:bg-foreground/90 sm:col-span-1"
@@ -97,12 +102,22 @@ export function Dashboard({
         </Button>
       </section>
       {!demo && (
-        <ActivityChat
-          key={household.id}
-          householdId={household.id}
-          householdName={household.name}
-          today={today}
-        />
+        <Link
+          href="/chat"
+          className="flex items-center justify-between gap-4 rounded-2xl border bg-card p-5 transition-colors hover:bg-secondary/50"
+        >
+          <div>
+            <Heading level={2} className="text-lg">
+              House Chat
+            </Heading>
+            <Text small muted>
+              Your housemates, your bills, and a little help from Homeshare.
+            </Text>
+          </div>
+          <span className="shrink-0 text-sm font-medium text-primary">
+            Open chat →
+          </span>
+        </Link>
       )}
       <section aria-label="Household this month" className="space-y-3 px-1">
         <div className="flex items-center justify-between gap-3">
@@ -212,6 +227,7 @@ export function Dashboard({
             </Card>
           ) : (
             <FriendlyState
+              variant={bills.length ? "chat" : "receipt"}
               title={
                 bills.length
                   ? "All settled. Nice feeling, right?"

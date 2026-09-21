@@ -1,78 +1,111 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 test.use({ ignoreHTTPSErrors: true });
-
-test("mobile activity: real signed proposals, clarification, cancel, retry, and household switch", async ({
+test.describe.configure({ timeout: 300_000 });
+const expectChat = expect.configure({ timeout: 30000 });
+test("house chat: shared persistence, pagination, retries, private proposals, switching and mobile composer", async ({
   page,
+  browser,
 }) => {
-  test.setTimeout(240_000);
-  page.setDefaultTimeout(20_000);
+  test.setTimeout(300_000);
   test.skip(
     process.env.SEED_ALLOWED !== "true" ||
       process.env.HOMESHARE_E2E_LLM_STUB !== "true",
-    "Requires designated dev auth/database and the test-process OpenRouter stub.",
+    "Requires designated dev auth/database and the process-only OpenRouter stub.",
   );
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.emulateMedia({ reducedMotion: "reduce" });
   const suffix = randomUUID();
-  const email = `activity-${suffix}@example.com`;
-  const homeName = `Activity ${suffix.slice(0, 8)}`;
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const homes: string[] = [];
   const users: string[] = [];
-  try {
-    await page.goto("/sign-up");
-    // Wait for an interactive control before filling SSR inputs.
-    await page.getByRole("button", { name: "Show password" }).click();
-    await page.getByRole("button", { name: "Hide password" }).click();
-    await page.getByLabel("Your name").fill("Alex Owner");
-    await page.getByLabel("Email address").fill(email);
-    await page
+  const secondContext = await browser.newContext({ ignoreHTTPSErrors: true });
+  const second = await secondContext.newPage();
+  const base = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3000")
+    .origin;
+  async function signup(target: Page, name: string, label: string) {
+    const email = `chat-${label.toLowerCase()}-${suffix}@example.com`;
+    await target.goto(`${base}/sign-up`);
+    await target.getByRole("button", { name: "Show password" }).click();
+    await target.getByLabel("Your name").fill(name);
+    await target.getByLabel("Email address").fill(email);
+    await target
       .getByLabel("Password", { exact: true })
       .fill(`Test-${randomUUID()}!`);
-    await page.getByRole("button", { name: "Create your account" }).click();
-    await expect(page).toHaveURL(/\/onboarding/);
-    await page.getByLabel("Household name").fill(homeName);
-    await page.getByRole("button", { name: "Create your household" }).click();
-    await expect(page).toHaveURL(/\/dashboard/);
+    await target.getByRole("button", { name: "Create your account" }).click();
+    await expectChat(target).toHaveURL(/\/onboarding/, { timeout: 60000 });
+    await target
+      .getByLabel("Household name")
+      .fill(`Chat ${label} ${suffix.slice(0, 6)}`);
+    await target.getByRole("button", { name: "Create your household" }).click();
+    await expectChat(target).toHaveURL(/\/dashboard/);
     const {
-      rows: [owner],
+      rows: [row],
     } = await pool.query(
-      "select p.id as user_id, m.id as member_id, m.household_id from profiles p join household_members m on m.user_id = p.id where p.email = $1",
+      "select p.id user_id, m.id member_id, m.household_id from profiles p join household_members m on m.user_id=p.id where p.email=$1",
       [email],
     );
-    homes.push(owner.household_id);
-    users.push(owner.user_id);
-    const memberIds = [owner.member_id, randomUUID(), randomUUID()];
+    homes.push(row.household_id);
+    users.push(row.user_id);
+    return row as { user_id: string; member_id: string; household_id: string };
+  }
+  async function switchTo(target: Page, name: string) {
+    await target
+      .getByRole("button", { name: /Switch household, current:/ })
+      .filter({ visible: true })
+      .click();
+    await target
+      .getByRole("button", { name: new RegExp(name + " (Owner|Member)") })
+      .click();
+    await expectChat(
+      target
+        .getByRole("button", { name: `Switch household, current: ${name}` })
+        .filter({ visible: true }),
+    ).toBeVisible();
+  }
+  async function send(target: Page, text: string) {
+    await target.getByLabel("Message your household").fill(text);
+    await target
+      .getByRole("button", { name: "Send message", exact: true })
+      .click();
+  }
+  try {
+    const owner = await signup(page, "Alex Owner", "Main");
+    const roommate = await signup(second, "Blair Roommate", "Other");
+    const roommateMember = randomUUID();
+    const otherOwnerMember = randomUUID();
     const billId = randomUUID();
     const client = await pool.connect();
     try {
       await client.query("begin");
-      for (let i = 1; i < 3; i++) {
-        const id = `activity-roommate-${suffix}-${i}`;
-        users.push(id);
-        await client.query(
-          "insert into profiles(id, name, email) values($1,$2,$3)",
-          [
-            id,
-            i === 1 ? "Allie Smith" : "Allie Jones",
-            `activity-${suffix}-${i}@example.com`,
-          ],
-        );
-        await client.query(
-          "insert into household_members(id, household_id, user_id) values($1,$2,$3)",
-          [memberIds[i], owner.household_id, id],
-        );
-      }
       await client.query(
-        "insert into bills(id, household_id, name, category, amount_cents, due_date, created_by) values($1,$2,'Electricity','Electricity',18642,'2027-09-28',$3)",
+        "insert into household_members(id,household_id,user_id) values($1,$2,$3),($4,$5,$6)",
+        [
+          roommateMember,
+          owner.household_id,
+          roommate.user_id,
+          otherOwnerMember,
+          roommate.household_id,
+          owner.user_id,
+        ],
+      );
+      await client.query(
+        "insert into bills(id,household_id,name,category,amount_cents,due_date,created_by) values($1,$2,'Electricity','Electricity',10000,'2027-09-28',$3)",
         [billId, owner.household_id, owner.user_id],
       );
-      for (const member of memberIds)
+      for (const member of [owner.member_id, roommateMember])
         await client.query(
-          "insert into bill_splits(household_id,bill_id,member_id,amount_cents) values($1,$2,$3,6214)",
+          "insert into bill_splits(household_id,bill_id,member_id,amount_cents) values($1,$2,$3,5000)",
           [owner.household_id, billId, member],
+        );
+      for (let i = 0; i < 48; i++)
+        await client.query(
+          "insert into chat_messages(household_id,sender_id,sender_name,kind,text,client_key,created_at) values($1,$2,'Alex Owner','human',$3,$4,now()-interval '1 day')",
+          [
+            owner.household_id,
+            owner.member_id,
+            `Earlier message ${i}`,
+            randomUUID(),
+          ],
         );
       await client.query("commit");
     } catch (error) {
@@ -81,358 +114,174 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
     } finally {
       client.release();
     }
+    await page.goto(`${base}/chat`);
+    await second.reload();
+    await switchTo(second, `Chat Main ${suffix.slice(0, 6)}`);
+    await second.goto(`${base}/chat`);
+    const log = page.getByRole("log");
+    await expectChat(
+      page.getByRole("heading", { name: "House Chat" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Load older messages" }).click();
+    await expectChat(
+      log.getByText("Earlier message 0", { exact: true }),
+    ).toBeAttached();
+    await expectChat(
+      page.getByRole("button", { name: "Load older messages" }),
+    ).toHaveCount(0);
+    await send(page, "Dinner at seven?");
+    await expectChat(
+      second.getByRole("log").getByText("Dinner at seven?", { exact: true }),
+    ).toBeVisible();
+    await send(second, "See you then!");
+    await expectChat(
+      log.getByText("See you then!", { exact: true }),
+    ).toBeVisible();
     await page.reload();
-    const submit = async (text: string) => {
-      await page.getByLabel("Describe bill activity").fill(text);
-      await page.getByRole("button", { name: "Send activity" }).click();
-    };
-    const starters = page
-      .getByLabel("Household prompt suggestions")
-      .getByRole("button");
-    await expect(starters).toHaveCount(3);
-    await page.screenshot({
-      path: `test-results/activity-starters-${test.info().project.name}.png`,
-      fullPage: true,
-    });
-    const firstStarter = starters.first();
-    await expect(firstStarter).toContainText("Electricity");
-    let interpretations = 0;
-    page.on("request", (request) => {
-      if (new URL(request.url()).pathname === "/api/activity")
-        interpretations++;
-    });
-    await firstStarter.click();
-    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
-      /Electricity/,
-    );
-    expect(interpretations).toBe(0);
-    await page
-      .getByRole("button", { name: "Add a bill or source", exact: true })
-      .click();
-    await page.getByLabel("Upload reference document").setInputFiles({
-      name: "electricity.txt",
-      mimeType: "text/plain",
-      buffer: Buffer.from(
-        "Electricity total $186.42, due 2027-09-28. contact@example.com",
-      ),
-    });
-    await expect(page.getByLabel("Source text")).toContainText(
-      "[email omitted]",
-    );
-    await page.getByRole("button", { name: "Use source", exact: true }).click();
-    await expect(page.getByLabel("Attached references")).toContainText(
-      "electricity.txt",
-    );
-    await submit("I paid $40 toward electricity");
-    const proposal = page.getByTestId("activity-proposal");
-    await expect(proposal).toContainText("Remaining after: $22.14");
-    await expect(
-      page.getByLabel("Conversation").locator("strong"),
-    ).toContainText("Review");
-    expect(
-      (
-        await pool.query(
-          "select count(*)::int as count from payments where household_id=$1",
-          homes,
-        )
-      ).rows[0].count,
-    ).toBe(0);
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
-    expect(
-      (
-        await pool.query(
-          "select count(*)::int as count from payments where household_id=$1",
-          homes,
-        )
-      ).rows[0].count,
-    ).toBe(0);
-    await submit("I paid $40 toward electricity");
-    await expect(proposal).toBeVisible();
-    await page
-      .getByRole("button", { name: "Confirm", exact: true })
-      .scrollIntoViewIfNeeded();
-    expect(
-      await page
-        .getByRole("button", { name: "Confirm", exact: true })
-        .evaluate((e) => e.getBoundingClientRect().height),
-    ).toBeGreaterThanOrEqual(44);
-    await page.screenshot({
-      path: "test-results/activity-mobile-proposal.png",
-      fullPage: true,
-    });
-    const confirmation = page.waitForRequest("**/api/activity/confirm");
-    // A synchronous double tap reaches the ref guard even before React rerenders.
-    await page
-      .getByRole("button", { name: "Confirm", exact: true })
-      .evaluate((e) => {
-        (e as HTMLButtonElement).click();
-        (e as HTMLButtonElement).click();
-      });
-    const command = (await confirmation).postDataJSON();
-    await expect(
-      page.getByText(/Updated Electricity\. Recorded \$40.00/),
+    await expectChat(
+      log.getByText("Dinner at seven?", { exact: true }),
     ).toBeVisible();
-    const replay = await page.request.post("/api/activity/confirm", {
-      data: command,
-      headers: { origin: new URL(page.url()).origin },
+    // Failure before delivery, then the same optimistic key succeeds once.
+    let fail = true;
+    await page.route("**/api/chat", async (route) => {
+      if (route.request().method() === "POST" && fail) {
+        fail = false;
+        await route.abort();
+      } else await route.continue();
     });
-    expect((await replay.json()).message).toContain("already recorded");
+    await send(page, "Retry this hello");
+    await page.getByRole("button", { name: "Failed to send · Retry" }).click();
+    await expectChat(
+      second.getByRole("log").getByText("Retry this hello", { exact: true }),
+    ).toBeVisible();
+    await page.unroute("**/api/chat");
     expect(
       (
         await pool.query(
-          "select count(*)::int as count from payments where household_id=$1",
-          homes,
+          "select count(*)::int n from chat_messages where household_id=$1 and text='Retry this hello'",
+          [owner.household_id],
         )
-      ).rows[0].count,
+      ).rows[0].n,
     ).toBe(1);
-    await page.getByRole("link", { name: "Open bill" }).click();
-    await expect(page.getByText("$40.00 paid · $22.14 left")).toBeVisible();
-    await page.goto("/dashboard");
-    await submit("Allie paid $10 toward electricity");
-    await expect(page.getByText("Which Allie did you mean?")).toBeVisible();
-    await page
-      .getByRole("button", { name: "Allie Smith", exact: true })
-      .click();
-    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
-      "Allie Smith",
-    );
-    await expect(proposal).toHaveCount(0);
-    await page.getByRole("button", { name: "Send activity" }).click();
-    await expect(proposal).toContainText("Allie Smith");
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
-    await submit("I paid $10 toward water");
-    await expect(
-      page.getByText(/total bill amount and due date/),
+    // Reading older messages must not jump to the newest message.
+    await log.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await send(second, "A new message while you read");
+    await expectChat(
+      page.getByRole("button", { name: "New messages" }),
     ).toBeVisible();
-    await page.getByLabel("Suggested next steps").scrollIntoViewIfNeeded();
-    await page.screenshot({
-      path: `test-results/activity-followup-${test.info().project.name}.png`,
-      fullPage: true,
-    });
-    await page
-      .getByRole("button", { name: "Add total & date", exact: true })
-      .click();
-    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
-      "The total is $[total], due [due date].",
-    );
-    await expect(
-      page.getByRole("button", { name: "Send activity" }),
-    ).toBeDisabled();
-    // Selecting a draft selects the whole first placeholder for immediate typing.
-    await expect(page.getByLabel("Describe bill activity")).toBeFocused();
-    expect(
-      await page.getByLabel("Describe bill activity").evaluate((element) => {
-        const input = element as HTMLTextAreaElement;
-        return input.value.slice(input.selectionStart, input.selectionEnd);
-      }),
-    ).toBe("[total]");
-    const details = page.getByLabel("Fill in draft details");
-    await expect(
-      page.locator("mark").filter({ hasText: "[total]" }),
+    expect(await log.evaluate((el) => el.scrollTop)).toBeLessThan(100);
+    await page.getByRole("button", { name: "New messages" }).click();
+    await send(page, "@Homeshare who still owes on electricity?");
+    await expectChat(
+      log.getByText(/Electricity has an outstanding balance/),
     ).toBeVisible();
-    await page.getByLabel("Household activity chat").screenshot({
-      path: `test-results/activity-editable-draft-${test.info().project.name}.png`,
+    await send(page, "I paid $10 toward electricity");
+    let proposal = log.getByTestId("activity-proposal").last();
+    await expectChat(proposal).toContainText("Alex Owner");
+    await expectChat(proposal).toContainText("Contribution: $10.00");
+    await page.reload();
+    proposal = log.getByTestId("activity-proposal").last();
+    await expectChat(
+      proposal.getByRole("button", { name: "Confirm", exact: true }),
+    ).toBeVisible();
+    const messageId = await proposal
+      .locator("xpath=ancestor::*[@data-message-id]")
+      .getAttribute("data-message-id");
+    await expectChat(
+      second.getByTestId("activity-proposal").last(),
+    ).toBeVisible();
+    await expectChat(
+      second.getByRole("button", { name: "Confirm", exact: true }),
+    ).toHaveCount(0);
+    const snapshot = await second.request.get(`${base}/api/chat`, {
+      headers: { "x-homeshare-household": owner.household_id },
     });
-    const openPlaceholder = async (token: string) => {
-      const input = page.getByLabel("Describe bill activity");
-      await input.evaluate((element) =>
-        window.scrollBy(
-          0,
-          element.getBoundingClientRect().top - window.innerHeight * 0.7,
-        ),
-      );
-      const rect = await page
-        .locator("mark")
-        .filter({ hasText: token })
-        .evaluate((element) => {
-          const fragment = Array.from(element.getClientRects()).at(-1)!;
-          return {
-            x: fragment.left + fragment.width / 2,
-            y: fragment.top + fragment.height / 2,
-            top: fragment.top,
-          };
-        });
-      if (test.info().project.name === "mobile-webkit")
-        await page.touchscreen.tap(rect.x, rect.y);
-      else await page.mouse.click(rect.x, rect.y);
-      const editor = page.getByRole("dialog");
-      await expect(editor).toBeVisible();
-      await expect(editor).toHaveAttribute("data-side", "top");
-      await expect
-        .poll(async () => {
-          const box = await editor.boundingBox();
-          return (
-            !!box &&
-            box.y + box.height <= rect.top + 1 &&
-            box.x >= 0 &&
-            box.x + box.width <= 390
-          );
-        })
-        .toBe(true);
-      return editor;
-    };
-    // Direct taps hit native textarea coordinates, including a wrapped token.
-    await openPlaceholder("[due date]");
-    await expect(page.getByRole("dialog").getByRole("grid")).toBeVisible();
-    // The calendar can cover the preceding line; its accessible field shortcut
-    // still switches straight to the amount without a separate dismissal.
-    await details
-      .getByRole("button", { name: "Bill total", exact: true })
-      .click();
-    await expect(page.getByLabel("Bill total", { exact: true })).toBeFocused();
-    await page.keyboard.press("Escape");
-    await expect(
-      details.getByRole("button", { name: "Bill total", exact: true }),
-    ).toBeFocused();
-    await openPlaceholder("[total]");
-    await page.getByLabel("Bill total", { exact: true }).fill("0");
-    await page.getByRole("button", { name: "Apply", exact: true }).click();
-    await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
-      "positive amount",
-    );
-    await page.getByLabel("Bill total", { exact: true }).fill("90");
-    await page.getByRole("button", { name: "Apply", exact: true }).click();
-    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
-      "The total is $90, due [due date].",
-    );
-    await openPlaceholder("[due date]");
-    const calendar = page.getByLabel("Choose due date", { exact: true });
-    // No date is silently selected; the calendar starts at the household's today.
-    const householdToday = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Chicago",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-    const [year, month] = householdToday.split("-");
-    await expect(calendar.getByRole("combobox", { name: /year/i })).toHaveValue(
-      year,
-    );
-    await expect(
-      calendar.getByRole("combobox", { name: /month/i }),
-    ).toHaveValue(String(Number(month) - 1));
-    await calendar
-      .getByRole("combobox", { name: /year/i })
-      .selectOption("2027");
-    await calendar.getByRole("combobox", { name: /month/i }).selectOption("8");
-    await calendar.screenshot({
-      path: `test-results/activity-date-picker-${test.info().project.name}.png`,
-    });
-    await calendar
-      .getByRole("button", { name: /September 28th, 2027/ })
-      .click();
-    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
-      "The total is $90, due Sep 28, 2027.",
-    );
-    await expect(details).toHaveCount(0);
-    await page.getByRole("button", { name: "Send activity" }).click();
-    await expect(proposal).toContainText("Create Water");
-    await expect(proposal).toContainText("Allie Jones");
-    // Lose the response AFTER the transaction commits, then retry the same token.
-    await page.route(
-      "**/api/activity/confirm",
-      async (route) => {
-        await route.fetch();
-        await route.abort("connectionreset");
+    expect(JSON.stringify(await snapshot.json())).not.toContain('"token"');
+    const forbidden = await second.request.post(
+      `${base}/api/activity/confirm`,
+      {
+        headers: { origin: base },
+        data: { householdId: owner.household_id, chatMessageId: messageId },
       },
-      { times: 1 },
     );
-    await page.getByRole("button", { name: "Confirm", exact: true }).click();
-    await expect(page.getByText(/Retry this same confirmation/)).toBeVisible();
-    await page.getByRole("button", { name: "Confirm", exact: true }).click();
-    await expect(
-      page.getByText(/previously confirmed activity was already recorded/),
+    expect(forbidden.status()).toBe(400);
+    expect((await forbidden.json()).message).toContain("Only the roommate");
+    await proposal
+      .getByRole("button", { name: "Confirm", exact: true })
+      .click();
+    await expectChat(
+      log.getByRole("link", { name: "Open bill" }),
     ).toBeVisible();
+    const repeat = await page.request.post(`${base}/api/activity/confirm`, {
+      headers: { origin: base },
+      data: { householdId: owner.household_id, chatMessageId: messageId },
+    });
+    expect((await repeat.json()).kind).toBe("success");
     expect(
       (
         await pool.query(
-          "select count(*)::int as count from bills where household_id=$1 and name='Water'",
-          homes,
+          "select count(*)::int n from payments where household_id=$1",
+          [owner.household_id],
         )
-      ).rows[0].count,
+      ).rows[0].n,
     ).toBe(1);
-    await page.goto("/onboarding?new=1");
-    await page
-      .getByLabel("Household name")
-      .fill(`Second ${suffix.slice(0, 8)}`);
-    await page.getByRole("button", { name: "Create your household" }).click();
-    await expect(page).toHaveURL(/\/dashboard/);
-    const { rows } = await pool.query(
-      "select household_id from household_members where user_id=$1",
-      [owner.user_id],
-    );
-    for (const row of rows)
-      if (!homes.includes(row.household_id)) homes.push(row.household_id);
-    await page
-      .getByRole("button", { name: /Switch household, current:/ })
-      .filter({ visible: true })
-      .click();
-    await page
-      .getByRole("button", { name: new RegExp(homeName + " Owner") })
-      .click();
-    await expect(
-      page
-        .getByRole("button", { name: `Switch household, current: ${homeName}` })
-        .filter({ visible: true }),
+    await send(second, "I paid $10 toward electricity");
+    await expectChat(
+      second.getByTestId("activity-proposal").last(),
+    ).toContainText("Blair Roommate");
+    await send(page, "@Homeshare provider error");
+    await expectChat(
+      log.getByText(/Homeshare is temporarily unavailable/),
     ).toBeVisible();
-    await submit("I paid $10 toward electricity");
-    await expect(proposal).toBeVisible();
-    await page
-      .getByRole("button", { name: /Switch household, current:/ })
-      .filter({ visible: true })
-      .click();
-    await page
-      .getByRole("button", {
-        name: new RegExp("Second " + suffix.slice(0, 8) + " Owner"),
-      })
-      .click();
-    await expect(
-      page
-        .getByRole("button", {
-          name: `Switch household, current: Second ${suffix.slice(0, 8)}`,
-        })
-        .filter({ visible: true }),
+    await send(page, "Human chat still works");
+    await expectChat(
+      second.getByRole("log").getByText("Human chat still works"),
     ).toBeVisible();
-    await expect(proposal).toHaveCount(0);
-    const wrongHome = await page.request.post("/api/activity/confirm", {
-      data: command,
-      headers: { origin: new URL(page.url()).origin },
-    });
-    expect(wrongHome.status()).toBe(400);
-    expect((await wrongHome.json()).message).toContain("household changed");
+    await second.goto(`${base}/demo`);
+    await page.setViewportSize({ width: 390, height: 450 });
+    await page.getByLabel("Message your household").focus();
+    await expectChat(
+      page.getByRole("button", { name: "Send message", exact: true }),
+    ).toBeInViewport();
     expect(
       await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
+        () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    // Ensure the chat remains compact and reachable at a keyboard-sized viewport.
-    await page.setViewportSize({ width: 390, height: 450 });
-    await submit("I paid $10 toward water");
-    await page
-      .getByRole("button", { name: "Add a bill or source", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Paste source", exact: true })
-      .click();
-    await page.getByLabel("Source name").fill("Water statement");
-    await page
-      .getByLabel("Source text")
-      .fill("Water total $90.00 due 2027-09-28");
-    await page.getByRole("button", { name: "Use source", exact: true }).click();
-    await submit("Use the attached bill details");
-    await expect(
-      page.getByRole("button", { name: "Confirm", exact: true }),
-    ).toBeInViewport();
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
-    // Recoverable provider failure, with no writes.
-    await submit("provider error");
-    await expect(page.getByText(/temporarily unavailable/)).toBeVisible();
+    await page.screenshot({
+      path: `test-results/chat-keyboard-${test.info().project.name}.png`,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await switchTo(page, `Chat Other ${suffix.slice(0, 6)}`);
+    await expectChat(page).toHaveURL(/\/chat/);
+    await expectChat(
+      page.getByText("Everyone on the same page."),
+    ).toBeVisible();
+    await expectChat(page.getByTestId("activity-proposal")).toHaveCount(0);
+    await expectChat(
+      log.getByText("Dinner at seven?", { exact: true }),
+    ).toHaveCount(0);
+    const stale = await page.request.get(`${base}/api/chat`, {
+      headers: { "x-homeshare-household": owner.household_id },
+    });
+    expect(stale.status()).toBe(409);
+    const wrongHome = await page.request.post(`${base}/api/activity/confirm`, {
+      headers: { origin: base },
+      data: { householdId: owner.household_id, chatMessageId: messageId },
+    });
+    expect(wrongHome.status()).toBe(400);
   } finally {
+    await page.close();
+    await secondContext.close();
     if (homes.length) {
       const client = await pool.connect();
       try {
         await client.query("begin");
         for (const table of [
+          "chat_jobs",
+          "chat_messages",
           "payments",
           "bill_splits",
           "bills",
@@ -442,7 +291,7 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
           "household_members",
         ])
           await client.query(
-            `delete from ${table} where household_id = any($1::uuid[])`,
+            `delete from ${table} where household_id=any($1::uuid[])`,
             [homes],
           );
         await client.query("delete from households where id=any($1::uuid[])", [

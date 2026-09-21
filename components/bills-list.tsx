@@ -116,6 +116,13 @@ export function BillsList({
             </div>
           ) : (
             <FriendlyState
+              variant={
+                !search &&
+                bills.length > 0 &&
+                (filter === "mine" || filter === "overdue")
+                  ? "chat"
+                  : "receipt"
+              }
               title={
                 search
                   ? "No bills by that name."

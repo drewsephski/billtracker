@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
   pgTable,
+  bigserial,
+  jsonb,
   uuid,
   text,
   integer,
@@ -218,5 +220,74 @@ export const payments = pgTable(
       "payment_reversal",
       sql`(${t.reversedAt} is null) = (${t.reversedBy} is null)`,
     ),
+  ],
+);
+
+// Append-only conversation. Sequence allocation is serialized per household in
+// chat.ts so incremental readers cannot skip a later-committing insert.
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sequence: bigserial("sequence", { mode: "number" }).notNull(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    senderId: uuid("sender_id"),
+    senderName: text("sender_name").notNull(),
+    kind: text("kind", { enum: ["human", "assistant", "system"] }).notNull(),
+    text: text("text").notNull(),
+    clientKey: uuid("client_key").notNull(),
+    sourceId: uuid("source_id"),
+    reply:
+      jsonb("reply").$type<import("@/lib/domain/activity").ActivityReply>(),
+    ...timestamps,
+  },
+  (t) => [
+    unique("chat_tenant_id").on(t.householdId, t.id),
+    unique("chat_send_unique").on(t.householdId, t.kind, t.clientKey),
+    index("chat_cursor_idx").on(t.householdId, t.sequence),
+    foreignKey({
+      columns: [t.householdId, t.senderId],
+      foreignColumns: [members.householdId, members.id],
+    }),
+    foreignKey({
+      columns: [t.householdId, t.sourceId],
+      foreignColumns: [t.householdId, t.id],
+    }),
+    check("chat_kind", sql`${t.kind} in ('human','assistant','system')`),
+    check(
+      "chat_sender",
+      sql`(${t.kind} = 'human') = (${t.senderId} is not null)`,
+    ),
+    check("chat_text_length", sql`length(${t.text}) between 1 and 4000`),
+  ],
+);
+// Private processing state. Signed contexts NEVER leave the server in group chat.
+export const chatJobs = pgTable(
+  "chat_jobs",
+  {
+    sourceId: uuid("source_id").primaryKey(),
+    householdId: uuid("household_id").notNull(),
+    state: text("state", { enum: ["queued", "processing", "done"] })
+      .notNull()
+      .default("queued"),
+    leaseId: uuid("lease_id"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    attempts: integer("attempts").notNull().default(0),
+    activeMessageId: uuid("active_message_id"),
+    token: text("token"),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.householdId, t.sourceId],
+      foreignColumns: [chatMessages.householdId, chatMessages.id],
+    }),
+    foreignKey({
+      columns: [t.householdId, t.activeMessageId],
+      foreignColumns: [chatMessages.householdId, chatMessages.id],
+    }),
+    index("chat_jobs_recovery_idx").on(t.householdId, t.state, t.leaseUntil),
+    check("chat_job_state", sql`${t.state} in ('queued','processing','done')`),
   ],
 );

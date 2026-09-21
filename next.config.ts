@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
+  distDir: process.env.HOMESHARE_BUILD_DIR || ".next",
   turbopack: { root: process.cwd() },
   async headers() {
     return [

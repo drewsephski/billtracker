@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useActionState } from "react";
+import { usePathname } from "next/navigation";
 import { Check } from "lucide-react";
 import { AnimatedIcon } from "@/components/icons/animated-icon";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,21 @@ export function HouseholdSwitcher({
   households: HouseholdOption[];
   activeId: string;
 }) {
-  const [state, action, pending] = useActionState(switchHouseholdAction, {});
+  const path = usePathname();
+  const [state, action, pending] = useActionState(
+    async (
+      previous: import("@/lib/domain/types").ActionResult,
+      form: FormData,
+    ) => {
+      window.dispatchEvent(new Event("homeshare:switch-start"));
+      try {
+        return await switchHouseholdAction(previous, form);
+      } finally {
+        window.dispatchEvent(new Event("homeshare:switch-end"));
+      }
+    },
+    {},
+  );
   const active = households.find((home) => home.id === activeId);
   return (
     <Popover>
@@ -48,6 +63,11 @@ export function HouseholdSwitcher({
           Your households
         </Text>
         <form action={action} className="max-h-64 overflow-y-auto">
+          <input
+            type="hidden"
+            name="returnTo"
+            value={path === "/chat" ? "/chat" : "/dashboard"}
+          />
           {households.map((home) => (
             <Button
               key={home.id}

@@ -9,7 +9,7 @@ export function Brand() {
       className="justify-start gap-1.5 px-0 hover:bg-transparent"
     >
       <Link href="/" aria-label="Homeshare home">
-        <Blob className="size-9" />
+        <Blob sizes="36px" className="size-9" />
         <span className="text-xl font-semibold tracking-[-0.055em]">
           homeshare<span className="text-primary">.</span>
         </span>

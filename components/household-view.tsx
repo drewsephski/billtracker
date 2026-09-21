@@ -71,7 +71,7 @@ export function HouseholdView({
         </Card>
         <Card id="invite" className="scroll-mt-24 bg-secondary/40">
           <CardHeader>
-            <Blob className="mb-2 size-28" />
+            <Blob variant="key" sizes="112px" className="mb-2 size-28" />
             <CardTitle>Room for one more?</CardTitle>
             <CardDescription>
               Invite a roommate so they can see and settle their share.

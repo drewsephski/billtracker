@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Heading, Text, Eyebrow } from "@/components/ui/typography";
 import { HouseholdForm } from "./account-forms";
 import { ThemePreferenceControl } from "./theme-toggle";
+import { Blob } from "./blob";
 import { signOut } from "@/lib/server/actions";
 import type { HouseholdData } from "@/lib/domain/types";
 export function SettingsView({
@@ -30,13 +31,16 @@ export function SettingsView({
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Your household</CardTitle>
-            <CardDescription>
-              {data.viewer.role === "owner"
-                ? "A few details that keep everyone on the same page."
-                : "Your household owner manages these settings."}
-            </CardDescription>
+          <CardHeader className="grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4">
+            <div className="space-y-2">
+              <CardTitle>Your household</CardTitle>
+              <CardDescription>
+                {data.viewer.role === "owner"
+                  ? "A few details that keep everyone on the same page."
+                  : "Your household owner manages these settings."}
+              </CardDescription>
+            </div>
+            <Blob variant="home" sizes="80px" className="size-20" />
           </CardHeader>
           <CardContent>
             <HouseholdForm

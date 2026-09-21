@@ -24,6 +24,7 @@ export async function AuthEntry({
   if (data?.user) redirect(destination);
   return (
     <PublicShell
+      variant={mode === "sign-up" && !invite ? "home" : "key"}
       title={
         invite
           ? `${mode === "sign-in" ? "Sign in" : "Create an account"} to join ${invite.name}.`

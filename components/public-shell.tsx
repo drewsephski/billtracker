@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { Blob } from "./blob";
+import { Blob, type BlobVariant } from "./blob";
 import { Reveal } from "./ui/motion";
 import { Brand } from "./brand";
 import {
@@ -15,10 +15,12 @@ import { Heading, Text, Eyebrow } from "@/components/ui/typography";
 export function PublicShell({
   title,
   description,
+  variant = "key",
   children,
 }: {
   title: string;
   description: string;
+  variant?: BlobVariant;
   children: React.ReactNode;
 }) {
   return (
@@ -31,7 +33,7 @@ export function PublicShell({
       </header>
       <main className="mx-auto grid max-w-5xl items-center gap-10 px-5 py-5 md:grid-cols-[0.9fr_1.1fr] md:gap-16 md:py-12">
         <div className="hidden flex-col gap-7 md:flex">
-          <Blob priority className="size-36" />
+          <Blob variant={variant} sizes="144px" className="size-36" />
           <Eyebrow>Shared home. Clear bills.</Eyebrow>
           <Heading level={2} className="text-4xl leading-tight">
             Less “who owes what?”
@@ -59,7 +61,7 @@ export function PublicShell({
         <Reveal>
           <Card className="relative">
             <div className="flex items-center gap-3 px-5 md:hidden">
-              <Blob className="size-20" />
+              <Blob variant={variant} sizes="80px" className="size-20" />
               <Eyebrow>Make yourself at home</Eyebrow>
             </div>
             <CardHeader>

@@ -276,7 +276,7 @@ export async function switchHouseholdAction(
   } catch (error) {
     return failure(error);
   }
-  redirect("/dashboard");
+  redirect(form.get("returnTo") === "/chat" ? "/chat" : "/dashboard");
 }
 
 export async function switchAccount(next: string) {

@@ -73,7 +73,11 @@ export default function Home() {
               className="absolute -inset-x-3 top-16 bottom-0 -z-10 rounded-[2rem] bg-secondary/60 sm:-inset-x-4"
             />
             <div className="flex h-32 items-end justify-end pr-5 sm:h-36 sm:pr-7">
-              <Blob priority className="-mb-2 size-40 sm:size-44" />
+              <Blob
+                priority
+                sizes="(max-width: 640px) 160px, 176px"
+                className="-mb-2 size-40 sm:size-44"
+              />
             </div>
             <BillCard bill={data.bills[1]} today={data.today} demo />
             <div
@@ -103,29 +107,32 @@ export default function Home() {
             {[
               {
                 icon: "home" as const,
+                blob: "home" as const,
                 title: "Your bills have a home.",
                 description:
                   "See what’s coming up, what’s overdue, and what’s already paid. No buried group-chat messages.",
               },
               {
                 icon: "users" as const,
+                blob: "receipt" as const,
                 title: "A fair share for everyone.",
                 description:
                   "Split equally or set custom amounts. Everyone can see their part and mark it paid.",
               },
               {
                 icon: "refresh-cw" as const,
+                blob: "calendar" as const,
                 title: "Ready for next month.",
                 description:
                   "Set monthly bills once. New bills appear automatically, and your payment history stays intact.",
               },
-            ].map(({ icon, title, description }) => (
+            ].map(({ icon, blob, title, description }) => (
               <Card key={title} data-animated-icon-trigger>
                 <CardHeader>
-                  <AnimatedIcon
-                    name={icon}
-                    className="mb-4 size-6 text-primary"
-                  />
+                  <div className="mb-2 flex items-center justify-between gap-4">
+                    <AnimatedIcon name={icon} className="size-6 text-primary" />
+                    <Blob variant={blob} sizes="96px" className="size-24" />
+                  </div>
                   <CardTitle>{title}</CardTitle>
                 </CardHeader>
                 <CardContent>

@@ -256,61 +256,12 @@ export function ActivityChat({
               />
             )}
           {p && (
-            <div
-              className="space-y-3 rounded-xl border bg-background/70 p-4"
-              data-testid="activity-proposal"
-            >
-              <div>
-                <Text className="break-words font-medium">
-                  {p.kind === "new" ? "Create " : ""}
-                  {p.name}
-                </Text>
-                <Text small muted>
-                  Due {dateLabel(p.dueDate, true)} · {money(p.totalCents)}
-                </Text>
-              </div>
-              {p.kind === "new" && (
-                <div className="space-y-1">
-                  {p.allocations.map((a, i) => (
-                    <div key={i} className="flex justify-between gap-4 text-sm">
-                      <span className="min-w-0 break-words">{a.name}</span>
-                      <span className="shrink-0 tabular-nums">
-                        {money(a.amountCents)}
-                      </span>
-                    </div>
-                  ))}
-                  <Text small muted>
-                    Split equally across all current roommates.
-                  </Text>
-                </div>
-              )}
-              <Text small className="break-words font-medium">
-                {p.payerName} · Contribution: {money(p.amountCents)}
-              </Text>
-              <Text small muted>
-                Current share: {money(p.shareCents)} · Already paid:{" "}
-                {money(p.paidCents)}
-                <br />
-                Remaining after: {money(p.remainingCents)}
-              </Text>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  className="min-h-11 flex-1"
-                  disabled={confirming || pending}
-                  onClick={() => void confirm()}
-                >
-                  {confirming ? "Recording…" : "Confirm"}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="min-h-11 flex-1"
-                  disabled={confirming}
-                  onClick={cancel}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
+            <ActivityConfirmation
+              p={p}
+              disabled={confirming || pending}
+              onConfirm={() => void confirm()}
+              onCancel={cancel}
+            />
           )}
           {reply?.billUrl && (
             <Button asChild variant="outline" className="min-h-11">
@@ -407,5 +358,78 @@ export function ActivityChat({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// Shared by the persistent household conversation and the existing activity UI.
+export function ActivityConfirmation({
+  p,
+  disabled = false,
+  onConfirm,
+  onCancel,
+}: {
+  p: NonNullable<ActivityReply["proposal"]>;
+  disabled?: boolean;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+}) {
+  return (
+    <div
+      className="space-y-3 rounded-xl border bg-background/70 p-4"
+      data-testid="activity-proposal"
+    >
+      <div>
+        <Text className="break-words font-medium">
+          {p.kind === "new" ? "Create " : ""}
+          {p.name}
+        </Text>
+        <Text small muted>
+          Due {dateLabel(p.dueDate, true)} · {money(p.totalCents)}
+        </Text>
+      </div>
+      {p.kind === "new" && (
+        <div className="space-y-1">
+          {p.allocations.map((a, i) => (
+            <div key={i} className="flex justify-between gap-4 text-sm">
+              <span className="min-w-0 break-words">{a.name}</span>
+              <span className="shrink-0 tabular-nums">
+                {money(a.amountCents)}
+              </span>
+            </div>
+          ))}
+          <Text small muted>
+            Split equally across all current roommates.
+          </Text>
+        </div>
+      )}
+      <Text small className="break-words font-medium">
+        {p.payerName} · Contribution: {money(p.amountCents)}
+      </Text>
+      <Text small muted>
+        Current share: {money(p.shareCents)} · Already paid:{" "}
+        {money(p.paidCents)}
+        <br />
+        Remaining after: {money(p.remainingCents)}
+      </Text>
+      {onConfirm && (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            className="min-h-11 flex-1"
+            disabled={disabled}
+            onClick={onConfirm}
+          >
+            {disabled ? "Please wait…" : "Confirm"}
+          </Button>
+          <Button
+            variant="outline"
+            className="min-h-11 flex-1"
+            disabled={disabled}
+            onClick={onCancel}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { BillDialog } from "./bill-form";
 import { BillsList } from "./bills-list";
+import { Blob } from "./blob";
 import { CategoryIcon } from "./bill-card";
 import { dateLabel, money } from "@/lib/domain/bills";
 import type { HouseholdData } from "@/lib/domain/types";
@@ -53,12 +54,15 @@ export function BillsView({
       />
       {data.templates.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle>On repeat</CardTitle>
-            <CardDescription>
-              Your monthly bills, taken care of ahead of time. Changing a
-              recurring bill only affects future instances.
-            </CardDescription>
+          <CardHeader className="grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4">
+            <div className="space-y-2">
+              <CardTitle>On repeat</CardTitle>
+              <CardDescription>
+                Your monthly bills, taken care of ahead of time. Changing a
+                recurring bill only affects future instances.
+              </CardDescription>
+            </div>
+            <Blob variant="calendar" sizes="80px" className="size-20" />
           </CardHeader>
           <CardContent className="@container flex flex-col gap-5">
             {data.templates.map((t, i) => (
