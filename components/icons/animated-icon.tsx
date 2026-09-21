@@ -46,9 +46,13 @@ type IconHandle = { startAnimation: () => void; stopAnimation: () => void };
 export function AnimatedIcon({
   name,
   className,
+  animateOnMount = false,
   ref: forwardedRef,
   ...props
-}: ComponentProps<"span"> & { name: AnimatedIconName }) {
+}: ComponentProps<"span"> & {
+  name: AnimatedIconName;
+  animateOnMount?: boolean;
+}) {
   const elementRef = useRef<HTMLSpanElement>(null);
   const controls = useRef<IconHandle>(null);
   const reduced = useReducedMotion();
@@ -57,6 +61,11 @@ export function AnimatedIcon({
   useEffect(() => {
     const element = elementRef.current;
     if (!element || reduced) return;
+    if (
+      animateOnMount &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      controls.current?.startAnimation();
     const target =
       element.closest<HTMLElement>(
         "[data-animated-icon-trigger], a, button, summary, .action-surface, [data-slot=card], [data-slot=select-scroll-up-button], [data-slot=select-scroll-down-button]",
@@ -96,7 +105,7 @@ export function AnimatedIcon({
       target.removeEventListener("focusin", start);
       target.removeEventListener("focusout", blur);
     };
-  }, [name, reduced]);
+  }, [animateOnMount, name, reduced]);
 
   return (
     <span

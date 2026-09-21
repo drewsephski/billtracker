@@ -5,7 +5,8 @@ import { Button } from "./ui/button";
 import { AnimatedIcon } from "./icons/animated-icon";
 import { Blob } from "./blob";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, CircleAlert, Info } from "lucide-react";
+import { CircleAlert, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { ActionResult } from "@/lib/domain/types";
 
 export function DemoNotice() {
@@ -33,17 +34,28 @@ export function DemoNotice() {
 }
 export function Feedback({ state }: { state: ActionResult }) {
   if (!state.error && !state.success) return null;
+  const success = Boolean(state.success && !state.error);
   return (
     <Reveal key={state.error || state.success}>
       <Alert
         variant={state.error ? "destructive" : "default"}
+        className={cn(
+          success &&
+            "grid-cols-[auto_minmax(0,1fr)] items-center border-success/30 bg-success/5",
+        )}
         role={state.error ? "alert" : "status"}
       >
-        {state.error ? <CircleAlert /> : <CheckCircle2 />}
-        <AlertDescription className="flex items-center gap-3">
-          <span className="flex-1">{state.error || state.success}</span>
+        {state.error ? (
+          <CircleAlert />
+        ) : (
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+            <AnimatedIcon name="check" animateOnMount />
+          </span>
+        )}
+        <AlertDescription className="flex min-w-0 items-center gap-3">
+          <span className="min-w-0 flex-1">{state.error || state.success}</span>
           {state.success && !state.error && (
-            <Blob variant="chat" sizes="40px" className="size-10 shrink-0" />
+            <Blob variant="chat" sizes="32px" className="size-8 shrink-0" />
           )}
         </AlertDescription>
       </Alert>
