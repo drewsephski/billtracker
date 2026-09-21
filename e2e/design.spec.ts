@@ -210,14 +210,25 @@ for (const width of [320, 390, 430]) {
       "/demo/household",
       "/demo/settings",
     ]) {
-      await page.goto(route);
-      await expect(page.locator("h1")).toBeVisible();
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth <= innerWidth,
-        ),
-        route,
-      ).toBe(true);
+      // Each layout probe owns its page. Hard-navigating an actively
+      // prefetching page makes WebKit report canceled RSC requests as errors.
+      const preview = await page.context().newPage();
+      await preview.setViewportSize({ width, height: 844 });
+      const recordError = (error: Error) => errors.push(error.message);
+      preview.on("pageerror", recordError);
+      try {
+        await preview.goto(route);
+        await expect(preview.locator("h1")).toBeVisible();
+        expect(
+          await preview.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+          route,
+        ).toBe(true);
+      } finally {
+        preview.off("pageerror", recordError);
+        await preview.close();
+      }
     }
     await page.goto("/demo");
     const balance = page.getByRole("region", { name: "Your balance" });
