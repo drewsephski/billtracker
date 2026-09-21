@@ -1,4 +1,5 @@
 "use client";
+import { HouseholdSwitcher, type HouseholdOption } from "./household-switcher";
 import { AnimatedIcon } from "@/components/icons/animated-icon";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -30,10 +31,12 @@ const links = [
 export function AppShell({
   data,
   demo = false,
+  households = [],
   children,
 }: {
   data: Pick<HouseholdData, "household" | "viewer" | "members">;
   demo?: boolean;
+  households?: HouseholdOption[];
   children: React.ReactNode;
 }) {
   const path = usePathname();
@@ -73,7 +76,16 @@ export function AppShell({
         <Card size="sm">
           <CardHeader>
             <CardDescription>Your shared space</CardDescription>
-            <CardTitle>{data.household.name}</CardTitle>
+            <CardTitle className="min-w-0">
+              {demo ? (
+                data.household.name
+              ) : (
+                <HouseholdSwitcher
+                  households={households}
+                  activeId={data.household.id}
+                />
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Badge variant="outline">
@@ -148,6 +160,14 @@ export function AppShell({
             </Avatar>
           </div>
         </header>
+        {!demo && (
+          <div className="flex min-w-0 border-b border-border/60 px-3 py-2 lg:hidden">
+            <HouseholdSwitcher
+              households={households}
+              activeId={data.household.id}
+            />
+          </div>
+        )}
         <main
           id="main-content"
           className="mx-auto flex w-full max-w-6xl px-5 pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-9 sm:pt-10 lg:pb-10"

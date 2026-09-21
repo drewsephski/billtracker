@@ -3,15 +3,15 @@ import { PasswordForm } from "@/components/account-forms";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; next?: string }>;
 }) {
-  const { token } = await searchParams;
+  const { token, next } = await searchParams;
   return (
     <PublicShell
       title={token ? "A fresh password." : "Request a new reset link."}
       description="Choose a password of at least eight characters."
     >
-      <PasswordForm token={token} />
+      <PasswordForm token={token} next={next} />
     </PublicShell>
   );
 }

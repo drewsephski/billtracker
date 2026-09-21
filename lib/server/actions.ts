@@ -1,4 +1,10 @@
 "use server";
+import { cookies } from "next/headers";
+import {
+  ACTIVE_HOUSEHOLD_COOKIE,
+  invitationDestination,
+} from "@/lib/domain/navigation";
+import { rememberHousehold } from "./active-household";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -11,6 +17,7 @@ import {
   acceptInvitation,
   createHousehold,
   inviteMember,
+  inHousehold,
   revokeInvitation,
   updateHousehold,
 } from "./households";
@@ -32,7 +39,7 @@ export async function authenticate(
 ): Promise<ActionResult> {
   let result;
   const next = String(form.get("next") || "/dashboard");
-  const safeNext = /^\/join\/[a-f0-9]{64}$/.test(next) ? next : "/dashboard";
+  const safeNext = invitationDestination(next);
   try {
     const values = authSchema.parse(Object.fromEntries(form));
     if (mode === "sign-up" && !values.name?.trim())
@@ -40,7 +47,7 @@ export async function authenticate(
     result =
       mode === "sign-up"
         ? await getAuth().signUp.email({ ...values, name: values.name! })
-        : await getAuth().signIn.email(values);
+        : await getAuth().signIn.email({ ...values, rememberMe: true });
     if (result.error)
       return {
         error: result.error.message || "Check your email and password.",
@@ -52,6 +59,7 @@ export async function authenticate(
 }
 export async function signOut() {
   await getAuth().signOut();
+  (await cookies()).delete(ACTIVE_HOUSEHOLD_COOKIE);
   redirect("/");
 }
 export async function createHouseholdAction(
@@ -60,7 +68,8 @@ export async function createHouseholdAction(
 ): Promise<ActionResult> {
   const user = await requireUser();
   try {
-    await createHousehold(user, Object.fromEntries(form));
+    const id = await createHousehold(user, Object.fromEntries(form));
+    await rememberHousehold(id);
   } catch (e) {
     return failure(e);
   }
@@ -150,9 +159,10 @@ export async function acceptAction(
   _state: ActionResult,
 ): Promise<ActionResult> {
   void _state;
-  const user = await requireUser();
+  const user = await requireUser(`/join/${token}`);
   try {
-    await acceptInvitation(user, token);
+    const id = await acceptInvitation(user, token);
+    await rememberHousehold(id);
   } catch (e) {
     return failure(e);
   }
@@ -174,9 +184,10 @@ export async function settingsAction(
 }
 export async function sendVerification(
   _state: ActionResult,
+  form: FormData,
 ): Promise<ActionResult> {
   void _state;
-  const user = await requireUser();
+  const user = await requireUser(invitationDestination(form.get("next")));
   try {
     const result = await getAuth().emailOtp.sendVerificationOtp({
       email: user.email,
@@ -193,7 +204,7 @@ export async function verifyEmail(
   _state: ActionResult,
   form: FormData,
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireUser(invitationDestination(form.get("next")));
   try {
     const otp = z
       .string()
@@ -208,9 +219,7 @@ export async function verifyEmail(
     return failure(e);
   }
   revalidatePath("/", "layout");
-  return {
-    success: "Your email is verified. You can return to your invitation.",
-  };
+  redirect(invitationDestination(form.get("next")));
 }
 export async function requestPasswordReset(
   _state: ActionResult,
@@ -220,7 +229,7 @@ export async function requestPasswordReset(
     const email = z.email().parse(form.get("email"));
     const result = await getAuth().requestPasswordReset({
       email,
-      redirectTo: `${appUrl()}/reset-password`,
+      redirectTo: `${appUrl()}/reset-password?next=${encodeURIComponent(invitationDestination(form.get("next")))}`,
     });
     if (result.error)
       return {
@@ -253,4 +262,25 @@ export async function resetPassword(
   } catch (e) {
     return failure(e);
   }
+}
+
+export async function switchHouseholdAction(
+  _state: ActionResult,
+  form: FormData,
+): Promise<ActionResult> {
+  const user = await requireUser();
+  try {
+    const id = String(form.get("householdId") || "");
+    await inHousehold(user, id, async () => rememberHousehold(id));
+    revalidatePath("/", "layout");
+  } catch (error) {
+    return failure(error);
+  }
+  redirect("/dashboard");
+}
+
+export async function switchAccount(next: string) {
+  await getAuth().signOut();
+  (await cookies()).delete(ACTIVE_HOUSEHOLD_COOKIE);
+  redirect(invitationDestination(next));
 }

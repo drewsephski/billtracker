@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { getDb, type Transaction } from "@/lib/db";
 import { households, invitations, members, profiles } from "@/lib/db/schema";
 import { DomainError } from "@/lib/domain/bills";
@@ -20,13 +20,48 @@ export async function syncProfile(tx: Transaction, user: Identity) {
       set: { name: user.name, email: user.email },
     });
 }
-export async function membershipFor(user: Identity) {
+export async function membershipFor(user: Identity, householdId: string) {
+  idSchema.parse(householdId);
   const [member] = await getDb()
     .select()
     .from(members)
-    .where(eq(members.userId, user.id))
+    .where(
+      and(eq(members.userId, user.id), eq(members.householdId, householdId)),
+    )
     .limit(1);
   return member;
+}
+export async function householdsFor(user: Identity) {
+  return getDb()
+    .select({ id: households.id, name: households.name, role: members.role })
+    .from(members)
+    .innerJoin(households, eq(members.householdId, households.id))
+    .where(eq(members.userId, user.id))
+    .orderBy(asc(members.createdAt), asc(members.id));
+}
+// Possession of the random invitation token grants only this onboarding preview.
+export async function invitationPreview(token: string) {
+  if (!/^[a-f0-9]{64}$/.test(token)) return null;
+  const [invite] = await getDb()
+    .select({
+      householdId: households.id,
+      name: households.name,
+      email: invitations.email,
+      expiresAt: invitations.expiresAt,
+      revokedAt: invitations.revokedAt,
+      acceptedAt: invitations.acceptedAt,
+    })
+    .from(invitations)
+    .innerJoin(households, eq(invitations.householdId, households.id))
+    .where(
+      eq(
+        invitations.tokenHash,
+        createHash("sha256").update(token).digest("hex"),
+      ),
+    );
+  if (!invite || invite.revokedAt || invite.expiresAt <= new Date())
+    return null;
+  return invite;
 }
 export async function inHousehold<T>(
   user: Identity,
@@ -72,11 +107,6 @@ export async function createHousehold(user: Identity, input: unknown) {
       .from(profiles)
       .where(eq(profiles.id, user.id))
       .for("update");
-    const [existing] = await tx
-      .select()
-      .from(members)
-      .where(eq(members.userId, user.id));
-    if (existing) throw new DomainError("You already belong to a household.");
     const [household] = await tx.insert(households).values(value).returning();
     await tx
       .insert(members)
@@ -195,10 +225,13 @@ export async function acceptInvitation(user: Identity, token: string) {
     const [existing] = await tx
       .select()
       .from(members)
-      .where(eq(members.userId, user.id));
-    if (existing?.householdId === invite.householdId) return invite.householdId;
-    if (existing)
-      throw new DomainError("You already belong to another household.");
+      .where(
+        and(
+          eq(members.userId, user.id),
+          eq(members.householdId, invite.householdId),
+        ),
+      );
+    if (existing) return invite.householdId;
     if (invite.acceptedAt)
       throw new DomainError("This invitation has already been used.");
 

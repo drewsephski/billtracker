@@ -2,6 +2,8 @@
 
 A friendly roommate household bill tracker built on Next.js 16, React 19, strict TypeScript, Tailwind CSS v4, shadcn/ui, Neon Postgres, Drizzle, and managed Neon Auth (Better Auth).
 
+Production: [homeshare.dev](https://homeshare.dev). The previous public Vercel domain redirects here, preserving paths and query strings.
+
 ## Run locally
 
 Node 22.12+ and pnpm 10.32.1 are required.
@@ -41,7 +43,7 @@ Server Components render the app. Small Client Components handle dialogs, filter
 | `neon_auth.*`               | Provider-managed users, sessions, credentials; not managed by Drizzle |
 | `profiles`                  | Auth-ID-keyed application identity, no passwords                      |
 | `households`                | Name and IANA time zone; USD in this version                          |
-| `household_members`         | Owner/member roles, one household per user                            |
+| `household_members`         | Owner/member roles per household; users can belong to multiple homes  |
 | `household_invitations`     | Email, hashed random token, expiry, acceptance/revocation             |
 | `recurring_bill_templates`  | Monthly rule, amount, next date, anchor day, version, active state    |
 | `recurring_template_splits` | Selected members and exact future allocations                         |
@@ -121,7 +123,7 @@ For a fresh setup: create a Neon project, enable Managed Better Auth, obtain the
 | `DATABASE_URL_UNPOOLED`   | For migrations   | Direct connection; runtime uses pooled URL                          |
 | `NEON_AUTH_BASE_URL`      | Yes              | This database branch’s managed-auth endpoint                        |
 | `NEON_AUTH_COOKIE_SECRET` | Yes              | Random secret of at least 32 characters; use `openssl rand -hex 32` |
-| `APP_URL`                 | Yes              | Canonical app origin, e.g. `https://your-home.vercel.app`           |
+| `APP_URL`                 | Yes              | Canonical app origin; production: `https://homeshare.dev`           |
 | `CRON_SECRET`             | Yes for cron     | Independent random bearer secret                                    |
 | `SEED_ALLOWED`            | Development only | Explicit opt-in for seeds and DB/browser lifecycle tests            |
 
@@ -130,8 +132,8 @@ No secrets use `NEXT_PUBLIC_`. `.env.local`, `.env.seed`, and `.env.production-r
 ## Deploy to Vercel
 
 1. Import this repository into Vercel with the Next.js preset, Node 22 or newer, pnpm install, and `pnpm build`. No custom output directory is needed.
-2. Set production variables from the Neon **main** branch. Generate independent cookie/cron secrets. Set `APP_URL` to the final deployment origin; omit `SEED_ALLOWED`.
-3. Add that exact HTTPS origin to the main branch’s Neon Auth trusted domains. Configure preview deployments with a separate Neon branch and corresponding trusted origin.
+2. Set production variables from the Neon **main** branch. Generate independent cookie/cron secrets. Set `APP_URL=https://homeshare.dev`; omit `SEED_ALLOWED`.
+3. Add `https://homeshare.dev` to the main branch’s Neon Auth trusted domains. Configure preview deployments with a separate Neon branch and corresponding trusted origin.
 4. Apply reviewed migrations to main using its direct connection: `DATABASE_URL_UNPOOLED='...' pnpm db:migrate`. Keep migrations separate from the build; do not race multiple deploys applying schema changes.
 5. Deploy. `vercel.json` schedules generation daily at 10:00 UTC. Vercel sends the configured `CRON_SECRET`; the route refuses missing/incorrect secrets. Lazy generation also works if cron is unavailable.
 6. On the deployed origin, create real accounts, verify email delivery and password reset, create a household, share an invitation, accept with a second account, create a small test bill, mark/undo shares, and inspect history. Remove test fixtures through a deliberate maintenance process before real use.
@@ -145,3 +147,11 @@ One household per account; USD only; up to 30 members; monthly recurrence; payme
 Best next work: verify production email/deployment lifecycle, member departure with historical membership retention, a clear unpaid-bill cancellation/archive flow, optional reminders and payment links, history pagination, and defense-in-depth RLS with a restricted runtime role.
 
 See [the implementation plan and researched official sources](docs/IMPLEMENTATION.md) and [agent conventions](AGENTS.md).
+
+### Multiple households and invitation onboarding
+
+Apply migration `0003_pretty_wraith.sql` with `pnpm db:migrate` before releasing this application update. It replaces the single-household constraint with a unique `(household_id, user_id)` membership and adds a user lookup index. No financial data is rewritten; migration `0002_financial_invariants.sql` remains intact.
+
+The household menu on desktop and mobile switches homes or starts another household. A server-set, HTTP-only cookie remembers the choice; every read resolves it against the signed-in account’s memberships and every mutation independently authorizes the supplied household. Missing or stale preferences fall back to the oldest membership. Joining or creating a household selects it immediately. Switching returns to the dashboard and remounts household UI, preventing stale bill drafts from carrying into another home.
+
+Invitation links preview the household and prefill the invited email. Signup, sign-in, verification and password recovery retain the invitation destination. Verification happens inside the invitation screen; wrong-account and unavailable-invitation states offer recovery. The email remains verified and email-bound at acceptance. Additional homes do not inherit owner permissions or existing bill allocations.

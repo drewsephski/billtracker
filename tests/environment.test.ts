@@ -6,8 +6,8 @@ afterEach(() => vi.unstubAllEnvs());
 describe("canonical URLs for invitations and password-reset emails", () => {
   it("uses the configured public origin in production", () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("APP_URL", " https://billtracker-gold.vercel.app/ ");
-    expect(appUrl()).toBe("https://billtracker-gold.vercel.app");
+    vi.stubEnv("APP_URL", " https://homeshare.dev/ ");
+    expect(appUrl()).toBe("https://homeshare.dev");
   });
 
   it.each([

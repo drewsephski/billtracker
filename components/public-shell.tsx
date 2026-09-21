@@ -29,11 +29,11 @@ export function PublicShell({
           <Link href="/demo">Take a peek</Link>
         </Button>
       </header>
-      <main className="mx-auto grid max-w-5xl items-center gap-10 px-5 py-5 md:grid-cols-2 md:py-20">
+      <main className="mx-auto grid max-w-5xl items-center gap-10 px-5 py-5 md:grid-cols-[0.9fr_1.1fr] md:gap-16 md:py-12">
         <div className="hidden flex-col gap-7 md:flex">
-          <Blob priority className="size-48" />
+          <Blob priority className="size-36" />
           <Eyebrow>Shared home. Clear bills.</Eyebrow>
-          <Heading level={2} className="text-5xl leading-tight">
+          <Heading level={2} className="text-4xl leading-tight">
             Less “who owes what?”
             <br />
             More feeling at home.
@@ -64,7 +64,9 @@ export function PublicShell({
             </div>
             <CardHeader>
               <CardTitle>
-                <Heading className="text-2xl sm:text-3xl">{title}</Heading>
+                <Heading className="break-words text-2xl sm:text-3xl">
+                  {title}
+                </Heading>
               </CardTitle>
               <CardDescription>{description}</CardDescription>
             </CardHeader>

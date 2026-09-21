@@ -9,6 +9,9 @@ import {
   createHousehold,
   inviteMember,
   membershipFor,
+  householdsFor,
+  invitationPreview,
+  updateHousehold,
   revokeInvitation,
 } from "@/lib/server/households";
 import { saveBill, recordPayment, updateTemplate } from "@/lib/server/bills";
@@ -46,6 +49,7 @@ describe.skipIf(!enabled)(
       email: `pending-${suffix}@example.com`,
       emailVerified: true,
     };
+    const additionalHomes: string[] = [];
     let householdId: string;
     let otherHousehold: string;
     let ownerMember: string;
@@ -85,12 +89,14 @@ describe.skipIf(!enabled)(
           acceptInvitation(roommate, token),
         ]),
       ).toEqual([householdId, householdId]);
-      ownerMember = (await membershipFor(owner))!.id;
-      roommateMember = (await membershipFor(roommate))!.id;
-      outsiderMember = (await membershipFor(outsider))!.id;
+      ownerMember = (await membershipFor(owner, householdId))!.id;
+      roommateMember = (await membershipFor(roommate, householdId))!.id;
+      outsiderMember = (await membershipFor(outsider, otherHousehold))!.id;
     });
     afterAll(async () => {
-      const ids = [householdId, otherHousehold].filter(Boolean);
+      const ids = [householdId, otherHousehold, ...additionalHomes].filter(
+        Boolean,
+      );
       if (ids.length)
         await getDb().transaction(async (tx) => {
           await tx
@@ -370,6 +376,62 @@ describe.skipIf(!enabled)(
       await expect(
         acceptInvitation(pendingUser, fresh.split("/").at(-1)!),
       ).rejects.toThrow();
+    });
+    it("supports multiple homes, scoped roles, repeat acceptance and tenant-safe lookups", async () => {
+      for (const name of ["Pending user home", "Pending user second home"]) {
+        additionalHomes.push(
+          await createHousehold(pendingUser, { name, timeZone: "UTC" }),
+        );
+      }
+      const url = await inviteMember(owner, householdId, {
+        email: pendingUser.email,
+      });
+      const token = url.split("/").at(-1)!;
+      expect((await invitationPreview(token))?.name).toBe(
+        "Integration household",
+      );
+      expect(
+        await Promise.all([
+          acceptInvitation(pendingUser, token),
+          acceptInvitation(pendingUser, token),
+        ]),
+      ).toEqual([householdId, householdId]);
+      const homes = await householdsFor(pendingUser);
+      expect(homes).toHaveLength(3);
+      expect(homes.find((home) => home.id === householdId)?.role).toBe(
+        "member",
+      );
+      expect(homes.find((home) => home.id === additionalHomes[0])?.role).toBe(
+        "owner",
+      );
+      expect(await membershipFor(pendingUser, otherHousehold)).toBeUndefined();
+      await expect(readHousehold(pendingUser, otherHousehold)).rejects.toThrow(
+        "not available",
+      );
+      await expect(
+        updateHousehold(pendingUser, householdId, {
+          name: "Not allowed",
+          timeZone: "UTC",
+        }),
+      ).rejects.toThrow("owner");
+      await updateHousehold(pendingUser, additionalHomes[0], {
+        name: "My renamed home",
+        timeZone: "UTC",
+      });
+      const primary = await readHousehold(pendingUser, householdId);
+      expect(primary.viewer.id).not.toBe(
+        (await membershipFor(pendingUser, additionalHomes[0]))!.id,
+      );
+      expect(primary.bills.length).toBeGreaterThan(0);
+      expect(
+        (await readHousehold(pendingUser, additionalHomes[0])).bills,
+      ).toHaveLength(0);
+      await expect(
+        getDb()
+          .insert(schema.members)
+          .values({ householdId, userId: pendingUser.id }),
+      ).rejects.toThrow();
+      expect(await invitationPreview("bad-link")).toBeNull();
     });
   },
 );

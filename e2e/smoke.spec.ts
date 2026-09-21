@@ -109,22 +109,34 @@ test("real Neon signup → household → invitation → bill → individual paym
   const context = await browser.newContext();
   const roommate = await context.newPage();
   await roommate.goto(invitation);
-  await roommate
-    .getByRole("link", { name: "Create an account to join" })
-    .click();
+  await expect(
+    roommate.getByRole("heading", { name: `Join Smoke home ${suffix}.` }),
+  ).toBeVisible();
+  await expect(roommate.getByLabel("Email address")).toHaveValue(roommateEmail);
+  await roommate.setViewportSize({ width: 390, height: 844 });
+  await roommate.screenshot({
+    path: "/tmp/homeshare-invite-mobile.png",
+    fullPage: true,
+  });
+  await page.goto(invitation);
+  await expect(
+    page.getByRole("button", { name: "Use the invited email" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Join household" }),
+  ).toHaveCount(0);
+  await page.goto("/household");
   await roommate.getByLabel("Your name").fill("Smoke Roommate");
   await roommate.getByLabel("Email address").fill(roommateEmail);
   await roommate.getByLabel("Password", { exact: true }).fill(password);
   await roommate.getByRole("button", { name: "Create your account" }).click();
   await expect(
-    roommate.getByRole("link", { name: "Verify your email first" }),
+    roommate.getByRole("button", { name: "Email me a verification code" }),
   ).toBeVisible();
-  await roommate.getByRole("button", { name: "Join household" }).click();
   await expect(
-    roommate
-      .getByRole("alert")
-      .filter({ hasText: "Verify your email before accepting" }),
-  ).toBeVisible();
+    roommate.getByRole("button", { name: "Join household" }),
+  ).toHaveCount(0);
+  await expect(roommate.getByLabel("Six-digit code")).toBeVisible();
   // Test fixture: verify the reserved example.com account on the dev branch only.
   // Email delivery itself is deliberately not simulated as an end-to-end pass.
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -136,7 +148,12 @@ test("real Neon signup → household → invitation → bill → individual paym
   } finally {
     await pool.end();
   }
-  await roommate.reload();
+  // Reproduce the reported bug: join while already owning another home.
+  await roommate.goto("/onboarding");
+  await roommate.getByLabel("Household name").fill(`Other home ${suffix}`);
+  await roommate.getByRole("button", { name: "Create your household" }).click();
+  await expect(roommate).toHaveURL(/\/dashboard/);
+  await roommate.goto(invitation);
   await roommate.getByRole("button", { name: "Join household" }).click();
   await expect(roommate).toHaveURL(/\/dashboard/);
   await page.goto("/bills");
@@ -190,5 +207,54 @@ test("real Neon signup → household → invitation → bill → individual paym
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.goto(billUrl);
   await expect(page.getByText("$99.99", { exact: true })).toBeVisible();
+  await roommate.goto("/dashboard");
+  await roommate
+    .getByRole("button", {
+      name: `Switch household, current: Smoke home ${suffix}`,
+    })
+    .filter({ visible: true })
+    .click();
+  await expect(
+    roommate.getByText("Your households", { exact: true }),
+  ).toBeVisible();
+  await roommate.screenshot({
+    path: "/tmp/homeshare-switcher-mobile.png",
+    fullPage: true,
+  });
+  await roommate
+    .getByRole("button", { name: `Other home ${suffix} Owner` })
+    .click();
+  await expect(
+    roommate
+      .getByRole("button", {
+        name: `Switch household, current: Other home ${suffix}`,
+      })
+      .filter({ visible: true }),
+  ).toBeVisible();
+  await roommate.reload();
+  await expect(
+    roommate
+      .getByRole("button", {
+        name: `Switch household, current: Other home ${suffix}`,
+      })
+      .filter({ visible: true }),
+  ).toBeVisible();
+  await roommate.goto("/bills");
+  await expect(
+    roommate.getByRole("link", {
+      name: `Shared internet ${suffix}`,
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await roommate.goto(invitation);
+  await roommate.getByRole("button", { name: "Open household" }).click();
+  await expect(roommate).toHaveURL(/\/dashboard/);
+  await roommate.goto("/bills");
+  await expect(
+    roommate.getByRole("link", {
+      name: `Shared internet ${suffix}`,
+      exact: true,
+    }),
+  ).toBeVisible();
   await context.close();
 });

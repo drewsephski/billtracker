@@ -1,8 +1,13 @@
 "use client";
 import { AnimatedIcon } from "@/components/icons/animated-icon";
 import Link from "next/link";
-import { useActionState, useState, useTransition } from "react";
-import { Copy, Check, Loader2 } from "lucide-react";
+import {
+  useActionState,
+  useState,
+  useTransition,
+  useSyncExternalStore,
+} from "react";
+import { Copy, Check, Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Disclosure } from "@/components/ui/disclosure";
+import { invitationDestination } from "@/lib/domain/navigation";
 import { Text } from "@/components/ui/typography";
 import { Feedback } from "./feedback";
 import {
@@ -34,6 +41,10 @@ import {
   verifyEmail,
 } from "@/lib/server/actions";
 import type { ActionResult } from "@/lib/domain/types";
+const subscribeToTimeZone = () => () => {};
+const browserTimeZone = () =>
+  Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago";
+const serverTimeZone = () => "America/Chicago";
 const zones = [
   "America/New_York",
   "America/Chicago",
@@ -68,18 +79,26 @@ function Submit({
 export function AuthForm({
   mode,
   next = "/dashboard",
+  email,
 }: {
   mode: "sign-in" | "sign-up";
   next?: string;
+  email?: string;
 }) {
   const [state, action, pending] = useActionState(
     authenticate.bind(null, mode),
     {},
   );
+  const [showPassword, setShowPassword] = useState(false);
+  const [values, setValues] = useState({
+    name: "",
+    email: email || "",
+    password: "",
+  });
   return (
     <form action={action}>
       <FieldGroup>
-        <input type="hidden" name="next" value={next} />
+        <input type="hidden" name="next" value={invitationDestination(next)} />
         {mode === "sign-up" && (
           <Field>
             <FieldLabel htmlFor="name">Your name</FieldLabel>
@@ -88,6 +107,10 @@ export function AuthForm({
               name="name"
               placeholder="Sarah"
               autoComplete="given-name"
+              value={values.name}
+              onChange={(event) =>
+                setValues({ ...values, name: event.target.value })
+              }
               required
               maxLength={80}
             />
@@ -101,35 +124,61 @@ export function AuthForm({
             type="email"
             placeholder="you@example.com"
             autoComplete="email"
+            value={values.email}
+            onChange={(event) =>
+              setValues({ ...values, email: event.target.value })
+            }
             required
           />
         </Field>
         <Field>
           <FieldLabel htmlFor="password">Password</FieldLabel>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete={
-              mode === "sign-in" ? "current-password" : "new-password"
-            }
-            minLength={8}
-            maxLength={128}
-            required
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              className="pr-12"
+              value={values.password}
+              onChange={(event) =>
+                setValues({ ...values, password: event.target.value })
+              }
+              autoComplete={
+                mode === "sign-in" ? "current-password" : "new-password"
+              }
+              minLength={8}
+              maxLength={128}
+              required
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="absolute right-1 top-1/2 -translate-y-1/2"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff /> : <Eye />}
+            </Button>
+          </div>
           <FieldDescription>
             {mode === "sign-up" ? (
               "At least 8 characters."
             ) : (
               <Button variant="link" size="sm" asChild className="p-0">
-                <Link href="/forgot-password">Forgot your password?</Link>
+                <Link
+                  href={`/forgot-password?next=${encodeURIComponent(invitationDestination(next))}`}
+                >
+                  Forgot your password?
+                </Link>
               </Button>
             )}
           </FieldDescription>
         </Field>
         <Feedback state={state} />
         <Submit pending={pending}>
-          {mode === "sign-in" ? "Welcome back" : "Create your account"}
+          {mode === "sign-in" ? "Sign in" : "Create your account"}
           <AnimatedIcon name="arrow-right" data-icon="inline-end" />
         </Submit>
         <Text muted small className="text-center">
@@ -157,6 +206,41 @@ export function HouseholdForm({
     household ? settingsAction.bind(null, household.id) : createHouseholdAction,
     {},
   );
+  const detectedTimeZone = useSyncExternalStore(
+    subscribeToTimeZone,
+    browserTimeZone,
+    serverTimeZone,
+  );
+  const [chosenTimeZone, setTimeZone] = useState<string>();
+  const timeZone = chosenTimeZone || household?.timeZone || detectedTimeZone;
+  const [name, setName] = useState(household?.name || "");
+  const timeZoneField = (
+    <Field>
+      <FieldLabel htmlFor="time-zone">Your household’s time zone</FieldLabel>
+      <Select
+        name="timeZone"
+        value={timeZone}
+        onValueChange={setTimeZone}
+        disabled={readOnly}
+      >
+        <SelectTrigger id="time-zone" className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {[...new Set([timeZone, ...zones])].map((zone) => (
+              <SelectItem value={zone} key={zone}>
+                {zone.replaceAll("_", " ")}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <FieldDescription>
+        Used for bill due dates. All amounts are in US dollars.
+      </FieldDescription>
+    </Field>
+  );
   return (
     <form action={action}>
       <FieldGroup>
@@ -166,45 +250,23 @@ export function HouseholdForm({
             id="household-name"
             name="name"
             placeholder="Lake Street Apartment"
-            defaultValue={household?.name}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             minLength={2}
             maxLength={80}
             required
             disabled={readOnly}
           />
         </Field>
-        <Field>
-          <FieldLabel htmlFor="time-zone">
-            Your household’s time zone
-          </FieldLabel>
-          <Select
-            name="timeZone"
-            defaultValue={household?.timeZone || "America/Chicago"}
-            disabled={readOnly}
+        {household ? (
+          timeZoneField
+        ) : (
+          <Disclosure
+            title={`Time zone · ${timeZone.split("/").at(-1)?.replaceAll("_", " ")}`}
           >
-            <SelectTrigger id="time-zone" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {[
-                  ...new Set([
-                    household?.timeZone || "America/Chicago",
-                    ...zones,
-                  ]),
-                ].map((zone) => (
-                  <SelectItem value={zone} key={zone}>
-                    {zone.replaceAll("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          <FieldDescription>
-            Bills become overdue after their due date in this time zone. All
-            amounts are in US dollars.
-          </FieldDescription>
-        </Field>
+            {timeZoneField}
+          </Disclosure>
+        )}
         <Feedback state={state} />
         {!readOnly && (
           <Submit pending={pending}>
@@ -320,7 +382,13 @@ export function RevokeButton({
     </div>
   );
 }
-export function AcceptForm({ token }: { token: string }) {
+export function AcceptForm({
+  token,
+  alreadyJoined = false,
+}: {
+  token: string;
+  alreadyJoined?: boolean;
+}) {
   const [state, action, pending] = useActionState(
     acceptAction.bind(null, token),
     {},
@@ -330,25 +398,27 @@ export function AcceptForm({ token }: { token: string }) {
       <FieldGroup>
         <Feedback state={state} />
         <Submit pending={pending}>
-          Join household
+          {alreadyJoined ? "Open household" : "Join household"}
           <AnimatedIcon name="arrow-right" data-icon="inline-end" />
         </Submit>
       </FieldGroup>
     </form>
   );
 }
-export function VerifyForm() {
+export function VerifyForm({ next = "/dashboard" }: { next?: string }) {
   const [sent, send, sending] = useActionState(sendVerification, {});
   const [verified, verify, verifying] = useActionState(verifyEmail, {});
   return (
     <div className="flex flex-col gap-6">
       <form action={send}>
+        <input type="hidden" name="next" value={invitationDestination(next)} />
         <FieldGroup>
           <Feedback state={sent} />
           <Submit pending={sending}>Email me a verification code</Submit>
         </FieldGroup>
       </form>
       <form action={verify}>
+        <input type="hidden" name="next" value={invitationDestination(next)} />
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="otp">Six-digit code</FieldLabel>
@@ -356,6 +426,8 @@ export function VerifyForm() {
               id="otp"
               name="otp"
               inputMode="numeric"
+              className="text-center text-xl tracking-[0.35em]"
+              placeholder="000000"
               autoComplete="one-time-code"
               pattern="[0-9]{6}"
               maxLength={6}
@@ -363,19 +435,26 @@ export function VerifyForm() {
             />
           </Field>
           <Feedback state={verified} />
-          <Submit pending={verifying}>Verify email</Submit>
+          <Submit pending={verifying}>Verify and continue</Submit>
         </FieldGroup>
       </form>
     </div>
   );
 }
-export function PasswordForm({ token }: { token?: string }) {
+export function PasswordForm({
+  token,
+  next = "/dashboard",
+}: {
+  token?: string;
+  next?: string;
+}) {
   const [state, action, pending] = useActionState(
     token ? resetPassword : requestPasswordReset,
     {},
   );
   return (
     <form action={action}>
+      <input type="hidden" name="next" value={invitationDestination(next)} />
       <FieldGroup>
         {token ? (
           <>
@@ -410,7 +489,11 @@ export function PasswordForm({ token }: { token?: string }) {
           {token ? "Update password" : "Send reset link"}
         </Submit>
         <Button variant="link" asChild>
-          <Link href="/sign-in">Back to sign in</Link>
+          <Link
+            href={`/sign-in?next=${encodeURIComponent(invitationDestination(next))}`}
+          >
+            Back to sign in
+          </Link>
         </Button>
       </FieldGroup>
     </form>

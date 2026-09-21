@@ -46,7 +46,8 @@ export const members = pgTable(
     ...timestamps,
   },
   (t) => [
-    unique("member_one_household").on(t.userId),
+    unique("member_household_user").on(t.householdId, t.userId),
+    index("members_user_idx").on(t.userId),
     unique("member_tenant_id").on(t.householdId, t.id),
     index("members_household_idx").on(t.householdId),
     check("member_role", sql`${t.role} in ('owner','member')`),

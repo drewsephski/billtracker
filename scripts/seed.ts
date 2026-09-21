@@ -94,7 +94,7 @@ async function main() {
       (b) => b.id === billId,
     )!;
     for (const person of people.slice(0, paidCount)) {
-      const member = await membershipFor(person);
+      const member = await membershipFor(person, householdId);
       await recordPayment(
         sarah,
         householdId,

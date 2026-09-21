@@ -1,44 +1,37 @@
-export const dynamic = "force-dynamic";
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { requireUser } from "@/lib/server/auth";
-import { membershipFor } from "@/lib/server/households";
+import { householdsFor } from "@/lib/server/households";
 import { HouseholdForm } from "@/components/account-forms";
 import { PublicShell } from "@/components/public-shell";
 import { Text } from "@/components/ui/typography";
+import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
+import { JoinLinkForm } from "@/components/join-link-form";
+export const dynamic = "force-dynamic";
 export default async function Page() {
   const user = await requireUser();
-  if (await membershipFor(user)) redirect("/dashboard");
+  const homes = await householdsFor(user);
   return (
     <PublicShell
-      title="Every home needs a home base."
-      description="Give your shared space a name. You can invite roommates next."
+      title={
+        homes.length ? "Make room for another home." : "What do you call home?"
+      }
+      description="Give your household a name. Everything else can wait."
     >
-      <ol
-        aria-label="Set up your household"
-        className="mb-6 flex items-center gap-3 text-xs text-muted-foreground"
-      >
-        <li
-          aria-current="step"
-          className="flex items-center gap-2 font-medium text-primary"
-        >
-          <span className="flex size-6 items-center justify-center rounded-full bg-secondary">
-            1
-          </span>
-          Your home
-        </li>
-        <li aria-hidden className="h-px flex-1 bg-border" />
-        <li className="flex items-center gap-2">
-          <span className="flex size-6 items-center justify-center rounded-full bg-muted">
-            2
-          </span>
-          Your roommates
-        </li>
-      </ol>
-      <HouseholdForm />
-      <Text small muted className="mt-6">
-        Joining an existing household? Open the invitation link your roommate
-        shared with you.
-      </Text>
+      <div className="flex flex-col gap-6">
+        <HouseholdForm />
+        <Text small muted>
+          You can invite roommates whenever you’re ready.
+        </Text>
+        <Disclosure title="Have an invitation instead?">
+          <JoinLinkForm />
+        </Disclosure>
+        {homes.length > 0 && (
+          <Button asChild variant="link">
+            <Link href="/dashboard">Back to your household</Link>
+          </Button>
+        )}
+      </div>
     </PublicShell>
   );
 }
