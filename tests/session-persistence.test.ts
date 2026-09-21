@@ -119,6 +119,35 @@ describe("browser session persistence through the real Neon SDK", () => {
     expect(response.headers.get("location")).toBeNull();
   });
 
+  it("exchanges the OAuth verifier before rendering the callback route", async () => {
+    upstream.mockResolvedValue(
+      new Response(null, {
+        status: 200,
+        headers: {
+          "Set-Cookie": `${tokenName}=renewed; Max-Age=604800; Path=/; HttpOnly; Secure; SameSite=Lax`,
+        },
+      }),
+    );
+    const response = await proxy(
+      new NextRequest(
+        "https://homeshare.example.com/dashboard?neon_auth_session_verifier=verifier",
+        {
+          headers: {
+            cookie:
+              "__Secure-neon-auth.session_challenge=challenge; theme=dark",
+          },
+        },
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://homeshare.example.com/dashboard",
+    );
+    expect(response.headers.getSetCookie().join(";")).toContain(
+      `${tokenName}=renewed`,
+    );
+  });
+
   it("refreshes account pages without intercepting APIs, the demo, or assets", () => {
     for (const url of ["/", "/sign-in", "/sign-up", "/join/token", "/bills/id"])
       expect(unstable_doesMiddlewareMatch({ config, url })).toBe(true);
