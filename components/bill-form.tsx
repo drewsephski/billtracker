@@ -1,6 +1,7 @@
 "use client";
 import { AnimatedIcon } from "@/components/icons/animated-icon";
 import { useState, useTransition } from "react";
+import { useBillEditorViewport } from "./use-bill-editor-viewport";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Pencil, Loader2 } from "lucide-react";
@@ -91,10 +92,10 @@ export function BillDialog({
         </Button>
       </DialogTrigger>
       <DialogContent
-        className="gap-2 pt-5 sm:max-w-md sm:p-5"
+        className="bill-editor sm:max-w-md"
         onInteractOutside={(event) => event.preventDefault()}
       >
-        <DialogHeader className="gap-1">
+        <DialogHeader className="shrink-0 gap-1 border-b px-5 py-4 pr-12">
           <DialogTitle>
             {bill
               ? "Edit this bill"
@@ -108,7 +109,7 @@ export function BillDialog({
             {bill
               ? "Changes apply to this bill only."
               : template
-                ? "Only future, ungenerated bills will change. Existing bills stay exactly as they are."
+                ? "Updates apply only to bills not yet created."
                 : "A few details. A fair share for everyone."}
           </DialogDescription>
         </DialogHeader>
@@ -142,6 +143,8 @@ function BillForm({
   demo: boolean;
   onSaved: () => void;
 }) {
+  const formRef = useBillEditorViewport();
+  const [focusedShare, setFocusedShare] = useState<string | null>(null);
   const initial = bill || template;
   const initialSplits = bill?.splits || template?.allocations;
   const [selected, setSelected] = useState(
@@ -187,8 +190,78 @@ function BillForm({
   } catch {
     /* Incomplete input is expected while typing. */
   }
+  let splitMessage = "Enter a total to preview the split.";
+  let splitDetail = "";
+  let splitInvalid = false;
+  try {
+    const total = parseMoney(amount);
+    if (mode === "custom") {
+      const assigned = selected.reduce(
+        (sum, id) => sum + parseMoney(custom[id] || "0"),
+        0,
+      );
+      const remaining = total - assigned;
+      splitMessage =
+        remaining === 0
+          ? "All shares add up"
+          : remaining > 0
+            ? `${money(remaining)} left to assign`
+            : `${money(-remaining)} over the total`;
+      splitDetail = `${money(assigned)} of ${money(total)} assigned`;
+      splitInvalid = remaining < 0;
+    } else {
+      splitMessage = `${money(total)} split equally`;
+      splitDetail = `Between ${selected.length} ${selected.length === 1 ? "roommate" : "roommates"}`;
+    }
+    if (!selected.length) splitMessage = "Select at least one roommate.";
+    if (total === 0) splitMessage = "Enter a total greater than $0.00.";
+  } catch {
+    if (amount) splitMessage = "Use amounts with up to 2 decimal places.";
+  }
+  const shareInputs = () =>
+    Array.from(
+      formRef.current?.querySelectorAll<HTMLInputElement>(
+        "[data-share-input]",
+      ) || [],
+    );
+  const finishShare = () => {
+    const inputs = shareInputs();
+    const index = inputs.findIndex(
+      (input) => input.dataset.shareInput === focusedShare,
+    );
+    const next = inputs[index + 1];
+    if (index >= 0 && next) next.focus({ preventScroll: true });
+    else
+      formRef.current
+        ?.closest('[role="dialog"]')
+        ?.querySelector<HTMLElement>('[data-slot="dialog-title"]')
+        ?.focus({ preventScroll: true });
+  };
+  const hasNextShare =
+    focusedShare !== null &&
+    members.filter((member) => selected.includes(member.id)).at(-1)?.id !==
+      focusedShare;
+
   return (
     <form
+      ref={formRef}
+      className="flex min-h-0 flex-1 flex-col"
+      onFocusCapture={(event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.closest("[data-share-navigation]")
+        )
+          return;
+        setFocusedShare(
+          event.target instanceof HTMLInputElement
+            ? event.target.dataset.shareInput || null
+            : null,
+        );
+      }}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget))
+          setFocusedShare(null);
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -239,208 +312,264 @@ function BillForm({
         });
       }}
     >
-      <FieldGroup className="gap-2.5 [&_[data-slot=input]]:min-h-11 [&_[data-slot=field][data-orientation=vertical]]:gap-1">
-        <Field>
-          <FieldLabel htmlFor="bill-name">Bill name</FieldLabel>
-          <Input
-            id="bill-name"
-            name="name"
-            placeholder="e.g. Electricity"
-            defaultValue={initial?.name}
-            required
-            maxLength={100}
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
+      <div
+        data-bill-fields
+        className="minimal-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
+      >
+        <FieldGroup className="gap-3 [&_[data-slot=input]]:min-h-11 [&_[data-slot=field][data-orientation=vertical]]:gap-1">
           <Field>
-            <FieldLabel htmlFor="bill-amount">Total amount ($)</FieldLabel>
+            <FieldLabel htmlFor="bill-name">Bill name</FieldLabel>
             <Input
-              id="bill-amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              inputMode="decimal"
-              placeholder="0.00"
+              id="bill-name"
+              name="name"
+              placeholder="e.g. Electricity"
+              defaultValue={initial?.name}
               required
+              maxLength={100}
             />
           </Field>
-          <Field>
-            <FieldLabel htmlFor="bill-date">
-              {template ? "Day of month" : "Due date"}
-            </FieldLabel>
-            {template ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Field>
+              <FieldLabel htmlFor="bill-amount">Total amount ($)</FieldLabel>
               <Input
-                id="bill-date"
-                type="number"
-                min={1}
-                max={31}
-                step={1}
-                value={templateDay}
-                onChange={(e) => setTemplateDay(e.target.value)}
+                id="bill-amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                inputMode="decimal"
+                placeholder="0.00"
                 required
               />
-            ) : (
-              <DatePicker
-                id="bill-date"
-                name="dueDate"
-                defaultValue={bill?.dueDate || today}
-                today={today}
-              />
-            )}
-          </Field>
-        </div>
-        {!bill && (
-          <Field orientation="horizontal" className="min-h-11">
-            <FieldLabel htmlFor="bill-recurring">
-              <AnimatedIcon name="refresh-cw" className="size-4" />
-              {template ? "Generate monthly bills" : "Repeat every month"}
-            </FieldLabel>
-            <Switch
-              id="bill-recurring"
-              checked={template ? active : recurring}
-              onCheckedChange={template ? setActive : setRecurring}
-            />
-          </Field>
-        )}
-        <FieldSet className="gap-2">
-          <FieldLegend className="mb-0 text-sm">
-            Who’s sharing this bill?
-          </FieldLegend>
-          <Tabs
-            value={mode}
-            onValueChange={(v) => setMode(v as "equal" | "custom")}
-          >
-            <TabsList className="w-full">
-              <TabsTrigger value="equal" className="flex-1">
-                Split equally
-              </TabsTrigger>
-              <TabsTrigger value="custom" className="flex-1">
-                Custom amounts
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <div className="divide-y divide-border/60 rounded-xl bg-muted/60">
-            {members.map((member) => (
-              <Field
-                key={member.id}
-                orientation="horizontal"
-                className="min-h-11 px-3"
-              >
-                <Checkbox
-                  id={`member-${member.id}`}
-                  checked={selected.includes(member.id)}
-                  onCheckedChange={(checked) =>
-                    setSelected((old) =>
-                      checked
-                        ? [...old, member.id]
-                        : old.filter((id) => id !== member.id),
-                    )
-                  }
-                />
-                <FieldLabel
-                  htmlFor={`member-${member.id}`}
-                  className="min-h-10 flex-1"
-                >
-                  {member.name}
-                </FieldLabel>
-                {mode === "custom" && selected.includes(member.id) ? (
-                  <Input
-                    aria-label={`${member.name}’s share in dollars`}
-                    inputMode="decimal"
-                    value={custom[member.id] || ""}
-                    onChange={(e) =>
-                      setCustom((old) => ({
-                        ...old,
-                        [member.id]: e.target.value,
-                      }))
-                    }
-                    placeholder="0.00"
-                    className="h-11 w-24 shrink-0 animate-in fade-in duration-150 motion-reduce:animate-none"
-                  />
-                ) : (
-                  <Text
-                    small
-                    muted
-                    className="flex h-11 w-24 shrink-0 items-center justify-end tabular-nums animate-in fade-in duration-150 motion-reduce:animate-none"
-                  >
-                    {allocation.find((a) => a.memberId === member.id)
-                      ? money(
-                          allocation.find((a) => a.memberId === member.id)!
-                            .amountCents,
-                        )
-                      : "—"}
-                  </Text>
-                )}
-              </Field>
-            ))}
-          </div>
-        </FieldSet>
-        <Disclosure
-          title="Category & optional note"
-          defaultOpen={Boolean(bill?.notes)}
-        >
-          <div className="space-y-2">
-            <Field orientation="horizontal" className="gap-3">
-              <FieldLabel htmlFor="bill-category">Category</FieldLabel>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger
-                  id="bill-category"
-                  className="min-h-11 w-auto min-w-0 flex-1"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {categories.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
             </Field>
-            {!template && (
-              <Field>
-                <FieldLabel htmlFor="bill-notes">
-                  Note <span className="text-muted-foreground">(optional)</span>
-                </FieldLabel>
-                <Textarea
-                  id="bill-notes"
-                  name="notes"
-                  defaultValue={bill?.notes}
-                  placeholder="Anything your roommates should know?"
-                  maxLength={500}
-                  rows={2}
+            <Field>
+              <FieldLabel htmlFor="bill-date">
+                {template ? "Day of month" : "Due date"}
+              </FieldLabel>
+              {template ? (
+                <Input
+                  id="bill-date"
+                  type="number"
+                  min={1}
+                  max={31}
+                  step={1}
+                  value={templateDay}
+                  onChange={(e) => setTemplateDay(e.target.value)}
+                  required
                 />
-              </Field>
-            )}
+              ) : (
+                <DatePicker
+                  id="bill-date"
+                  name="dueDate"
+                  defaultValue={bill?.dueDate || today}
+                  today={today}
+                />
+              )}
+            </Field>
           </div>
-        </Disclosure>
-        <Feedback state={state} />
-        <div className="sticky -bottom-5 -mx-1 flex items-center justify-end gap-2 border-t bg-popover px-1 pt-3 pb-1">
+          {!bill && (
+            <Field orientation="horizontal" className="min-h-11">
+              <FieldLabel htmlFor="bill-recurring">
+                <AnimatedIcon name="refresh-cw" className="size-4" />
+                {template ? "Generate monthly bills" : "Repeat every month"}
+              </FieldLabel>
+              <Switch
+                id="bill-recurring"
+                checked={template ? active : recurring}
+                onCheckedChange={template ? setActive : setRecurring}
+              />
+            </Field>
+          )}
+          <FieldSet className="gap-2">
+            <FieldLegend className="mb-0 text-sm">
+              Who’s sharing this bill?
+            </FieldLegend>
+            <Tabs
+              value={mode}
+              onValueChange={(v) => setMode(v as "equal" | "custom")}
+            >
+              <TabsList className="w-full">
+                <TabsTrigger value="equal" className="flex-1">
+                  Split equally
+                </TabsTrigger>
+                <TabsTrigger value="custom" className="flex-1">
+                  Custom amounts
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="divide-y divide-border/60 rounded-xl bg-muted/60">
+              {members.map((member) => (
+                <Field
+                  key={member.id}
+                  orientation="horizontal"
+                  className="min-h-14 gap-3 px-3 py-1.5 focus-within:bg-secondary/60"
+                >
+                  <Checkbox
+                    id={`member-${member.id}`}
+                    checked={selected.includes(member.id)}
+                    onCheckedChange={(checked) =>
+                      setSelected((old) =>
+                        checked
+                          ? [...old, member.id]
+                          : old.filter((id) => id !== member.id),
+                      )
+                    }
+                  />
+                  <FieldLabel
+                    htmlFor={`member-${member.id}`}
+                    className="min-h-10 min-w-0 flex-1 break-words"
+                  >
+                    {member.name}
+                  </FieldLabel>
+                  {mode === "custom" && selected.includes(member.id) ? (
+                    <Input
+                      aria-label={`${member.name}’s share in dollars`}
+                      aria-describedby="bill-split-status"
+                      data-share-input={member.id}
+                      enterKeyHint={
+                        members.filter((m) => selected.includes(m.id)).at(-1)
+                          ?.id === member.id
+                          ? "done"
+                          : "next"
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          finishShare();
+                        }
+                      }}
+                      inputMode="decimal"
+                      value={custom[member.id] || ""}
+                      onChange={(e) =>
+                        setCustom((old) => ({
+                          ...old,
+                          [member.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="0.00"
+                      className="h-11 w-28 shrink-0 bg-background text-right tabular-nums"
+                    />
+                  ) : (
+                    <Text
+                      small
+                      muted
+                      className="flex h-11 w-28 shrink-0 items-center justify-end tabular-nums animate-in fade-in duration-150 motion-reduce:animate-none"
+                    >
+                      {allocation.find((a) => a.memberId === member.id)
+                        ? money(
+                            allocation.find((a) => a.memberId === member.id)!
+                              .amountCents,
+                          )
+                        : "—"}
+                    </Text>
+                  )}
+                </Field>
+              ))}
+            </div>
+          </FieldSet>
+          <Disclosure
+            title="Category & optional note"
+            defaultOpen={Boolean(bill?.notes)}
+          >
+            <div className="space-y-2">
+              <Field orientation="horizontal" className="gap-3">
+                <FieldLabel htmlFor="bill-category">Category</FieldLabel>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger
+                    id="bill-category"
+                    className="min-h-11 w-auto min-w-0 flex-1"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {categories.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              {!template && (
+                <Field>
+                  <FieldLabel htmlFor="bill-notes">
+                    Note{" "}
+                    <span className="text-muted-foreground">(optional)</span>
+                  </FieldLabel>
+                  <Textarea
+                    id="bill-notes"
+                    name="notes"
+                    defaultValue={bill?.notes}
+                    placeholder="Anything your roommates should know?"
+                    maxLength={500}
+                    rows={2}
+                  />
+                </Field>
+              )}
+            </div>
+          </Disclosure>
           {demo && (
-            <Button asChild variant="ghost" className="mr-auto px-2">
-              <Link href="/sign-up">Create household</Link>
+            <Text small muted>
+              Read-only demo.{" "}
+              <Link href="/sign-up" className="underline underline-offset-4">
+                Create your household
+              </Link>{" "}
+              to save.
+            </Text>
+          )}
+        </FieldGroup>
+      </div>
+      <div className="shrink-0 space-y-2 border-t bg-popover px-5 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex min-h-11 items-center justify-between gap-2">
+          <div
+            id="bill-split-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="min-w-0 text-sm"
+          >
+            <p
+              className={
+                splitInvalid ? "font-medium text-destructive" : "font-medium"
+              }
+            >
+              {splitMessage}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {splitDetail || "Shares must match the bill total."}
+            </p>
+          </div>
+          {focusedShare && (
+            <Button
+              data-share-navigation
+              type="button"
+              variant="secondary"
+              size="sm"
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={finishShare}
+            >
+              {hasNextShare ? "Next" : "Done"}
             </Button>
           )}
-          <Button
-            type="submit"
-            className={demo ? undefined : "w-full sm:w-auto"}
-            disabled={pending || selected.length === 0}
-          >
-            {pending && (
-              <Loader2 className="animate-spin" data-icon="inline-start" />
-            )}
-            {pending
-              ? "Saving…"
-              : template
-                ? "Save future settings"
-                : bill
-                  ? "Save changes"
-                  : "Add bill"}
-          </Button>
         </div>
-      </FieldGroup>
+        <Feedback state={state} />
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={pending || allocation.length === 0}
+        >
+          {pending && (
+            <Loader2 className="animate-spin" data-icon="inline-start" />
+          )}
+          {pending
+            ? "Saving…"
+            : template
+              ? "Save future settings"
+              : bill
+                ? "Save changes"
+                : "Add bill"}
+        </Button>
+      </div>
     </form>
   );
 }

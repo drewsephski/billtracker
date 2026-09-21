@@ -284,3 +284,27 @@
     }
   }
 }
+
+/* The bill editor owns one scroll area; its actions never overlap fields. */
+.bill-editor[data-slot="dialog-content"] {
+  --editor-height: 100dvh;
+  --editor-top: 0px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: min(46rem, calc(var(--editor-height) - 12px));
+  max-height: calc(var(--editor-height) - 12px);
+  bottom: calc(100% - var(--editor-top) - var(--editor-height));
+  overflow: hidden;
+  padding: 0;
+  scrollbar-gutter: auto;
+  /* Focus measurements must use the resized bounds in this frame. */
+  transition: none;
+}
+@media (min-width: 640px) {
+  .bill-editor[data-slot="dialog-content"] {
+    top: calc(var(--editor-top) + var(--editor-height) / 2);
+    bottom: auto;
+    padding: 0;
+  }
+}

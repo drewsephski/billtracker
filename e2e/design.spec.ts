@@ -421,3 +421,112 @@ test("split mode changes preserve dialog and control positions", async ({
     });
   }
 });
+
+test("recurring custom shares stay visible above a simulated phone keyboard", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/demo/bills");
+  await page
+    .getByRole("group", { name: "Electricity recurring bill", exact: true })
+    .getByRole("button", { name: "Manage", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Edit recurring bill" });
+  await expect(dialog.getByRole("heading")).toBeFocused();
+  await page.getByRole("tab", { name: "Custom amounts" }).click();
+  const sarah = page.getByLabel("Sarah’s share in dollars");
+  const emma = page.getByLabel("Emma’s share in dollars");
+  const olivia = page.getByLabel("Olivia’s share in dollars");
+  const save = dialog.getByRole("button", { name: "Save future settings" });
+  await sarah.focus();
+
+  // Playwright cannot open an OS keyboard. Model Safari's separate visual
+  // viewport (including its pan offset), leaving the layout viewport unchanged.
+  await page.evaluate(() => {
+    const viewport = window.visualViewport!;
+    Object.defineProperty(viewport, "height", {
+      configurable: true,
+      value: 360,
+    });
+    Object.defineProperty(viewport, "offsetTop", {
+      configurable: true,
+      value: 55,
+    });
+    viewport.dispatchEvent(new Event("resize"));
+    viewport.dispatchEvent(new Event("scroll"));
+  });
+  const expectUnobscured = async (input: Locator) => {
+    await expect(input).toBeFocused();
+    await expect
+      .poll(async () =>
+        input.evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          const visible = element
+            .closest("[data-bill-fields]")!
+            .getBoundingClientRect();
+          const viewport = window.visualViewport!;
+          return (
+            bounds.top >= visible.top &&
+            bounds.bottom <= visible.bottom &&
+            bounds.top >= viewport.offsetTop &&
+            bounds.bottom <= viewport.offsetTop + viewport.height
+          );
+        }),
+      )
+      .toBe(true);
+    const bounds = await save.boundingBox();
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(415);
+    expect(bounds!.y).toBeGreaterThan((await input.boundingBox())!.y);
+  };
+  await expectUnobscured(sarah);
+  await sarah.fill("60.00");
+  await expect(dialog.getByRole("status")).toContainText(
+    "$2.14 left to assign",
+  );
+  await expect(save).toBeDisabled();
+  await dialog.getByRole("button", { name: "Next", exact: true }).click();
+  await expectUnobscured(emma);
+  await emma.fill("60.00");
+  await emma.press("Enter");
+  await expectUnobscured(olivia);
+  await olivia.fill("70.00");
+  await expect(dialog.getByRole("status")).toContainText(
+    "$3.58 over the total",
+  );
+  await expect(save).toBeDisabled();
+  await olivia.fill("66.421");
+  await expect(dialog.getByRole("status")).toContainText(
+    "up to 2 decimal places",
+  );
+  await expect(save).toBeDisabled();
+  await olivia.fill("66.42");
+  await expect(dialog.getByRole("status")).toContainText("All shares add up");
+  await expect(save).toBeEnabled();
+  await dialog.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(dialog.getByRole("heading")).toBeFocused();
+  await page.evaluate(() => {
+    const viewport = window.visualViewport!;
+    Reflect.deleteProperty(viewport, "height");
+    Reflect.deleteProperty(viewport, "offsetTop");
+    viewport.dispatchEvent(new Event("resize"));
+  });
+  await expect
+    .poll(async () => (await dialog.boundingBox())!.height)
+    .toBeGreaterThan(600);
+  await expect(sarah).toHaveValue("60.00");
+  await expect(emma).toHaveValue("60.00");
+  await expect(olivia).toHaveValue("66.42");
+  await save.click();
+  await expect(dialog.getByRole("alert")).toContainText("read-only demo");
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await page
+    .getByRole("group", { name: "Electricity recurring bill", exact: true })
+    .getByRole("button", { name: "Manage", exact: true })
+    .click();
+  await expect(dialog.getByLabel("Total amount ($)")).toHaveValue("186.42");
+  expect(errors).toEqual([]);
+});
