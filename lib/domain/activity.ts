@@ -8,6 +8,7 @@ import {
   validDate,
   type Category,
 } from "./bills";
+import type { ActivityGuidance } from "./activity-prompts";
 import type { BillView, HouseholdData, MemberView } from "./types";
 
 // Extraction only. No IDs, authorization decisions, or executable operations.
@@ -52,6 +53,7 @@ export type ActivityResolution =
   | {
       kind: "clarification";
       message: string;
+      guidance?: ActivityGuidance;
       choices?: { label: string; selection: ActivitySelection }[];
     }
   | { kind: "proposal"; proposal: ActivityProposal };
@@ -59,6 +61,7 @@ export type ActivityReply = {
   kind: "clarification" | "proposal" | "success" | "error";
   message: string;
   token?: string;
+  guidance?: ActivityGuidance;
   choices?: string[];
   proposal?: Omit<
     ActivityProposal,
@@ -129,9 +132,13 @@ export function contributionCents(value: string) {
   if (cents <= 0) throw new Error("Enter a contribution greater than zero.");
   return cents;
 }
-const clarify = (message: string): ActivityResolution => ({
+const clarify = (
+  message: string,
+  guidance?: ActivityGuidance,
+): ActivityResolution => ({
   kind: "clarification",
   message,
+  ...(guidance ? { guidance } : {}),
 });
 export function resolveActivity(
   raw: ActivityIntent,
@@ -159,10 +166,42 @@ export function resolveActivity(
   if (!intent.payer)
     return clarify(
       "Who contributed? You can say “I” or use a roommate’s name.",
+      {
+        placeholder: "Who made the contribution?",
+        prompts: data.members
+          .filter((m) => canManageShare(data.viewer.role, data.viewer.id, m.id))
+          .slice(0, 3)
+          .map((m) => ({
+            label: m.id === data.viewer.id ? "It was me" : m.name,
+            text:
+              m.id === data.viewer.id
+                ? "I made the contribution."
+                : `${m.name} made the contribution.`,
+          })),
+      },
     );
   if (!intent.amount)
-    return clarify("How much did they contribute toward their own share?");
-  if (!intent.bill) return clarify("Which bill was the contribution for?");
+    return clarify("How much did they contribute toward their own share?", {
+      placeholder: "Enter the contribution amount…",
+      prompts: [
+        { label: "Enter an amount", text: "The contribution was $[amount]." },
+      ],
+    });
+  if (!intent.bill)
+    return clarify("Which bill was the contribution for?", {
+      placeholder: "Which bill and due date?",
+      prompts: data.bills
+        .filter((b) =>
+          b.splits.some((s) =>
+            canManageShare(data.viewer.role, data.viewer.id, s.memberId),
+          ),
+        )
+        .slice(0, 3)
+        .map((b) => ({
+          label: `${b.name} · ${b.dueDate}`,
+          text: `It’s for ${b.name}, due ${b.dueDate}.`,
+        })),
+    });
   if (intent.incomplete)
     return clarify(
       "Please clarify whether this is their own share contribution and which bill you mean. Include a due date if you mean a particular period.",
@@ -175,11 +214,26 @@ export function resolveActivity(
   } catch {
     return clarify(
       "Use a positive dollar amount with at most two decimal places, for example 50.00.",
+      {
+        placeholder: "Enter the corrected dollar amount…",
+        prompts: [
+          {
+            label: "Correct the amount",
+            text: "The contribution is $[amount].",
+          },
+        ],
+      },
     );
   }
   if (intent.dueDate && !validDate(intent.dueDate))
     return clarify(
       "What is the due date? Please include month, day, and year.",
+      {
+        placeholder: "Due date, including the year…",
+        prompts: [
+          { label: "Enter due date", text: "The due date is [YYYY-MM-DD]." },
+        ],
+      },
     );
   if (intent.period && !/^\d{4}-(0[1-9]|1[0-2])$/.test(intent.period))
     return clarify("Which month and year is this bill for?");
@@ -207,11 +261,33 @@ export function resolveActivity(
       };
     return clarify(
       `I can’t find ${intent.payer} in this household. Choose a current roommate.`,
+      {
+        placeholder: "Choose a current roommate…",
+        prompts: data.members
+          .filter((m) => canManageShare(data.viewer.role, data.viewer.id, m.id))
+          .slice(0, 3)
+          .map((m) => ({
+            label: m.id === data.viewer.id ? "It was me" : m.name,
+            text:
+              m.id === data.viewer.id
+                ? "I made the contribution."
+                : `${m.name} made the contribution.`,
+          })),
+      },
     );
   }
   if (!canManageShare(data.viewer.role, data.viewer.id, payer.id))
     return clarify(
       "You can only record contributions toward your own share. The household owner can record someone else’s.",
+      {
+        placeholder: "Describe your own contribution…",
+        prompts: [
+          {
+            label: "Record my own share",
+            text: "I made the contribution toward my own share.",
+          },
+        ],
+      },
     );
   const candidates = billCandidates(intent, data.bills);
   const bill = selection.billId
@@ -256,6 +332,19 @@ export function resolveActivity(
     if (amountCents > share.amountCents - share.paidCents)
       return clarify(
         `${payer.name} has ${money(share.amountCents - share.paidCents)} left on this share. Please correct the contribution amount.`,
+        {
+          placeholder: "Enter an amount within the remaining share…",
+          prompts: [
+            {
+              label: `Use remaining ${money(share.amountCents - share.paidCents)}`,
+              text: `The contribution is ${money(share.amountCents - share.paidCents)}.`,
+            },
+            {
+              label: "Use a smaller amount",
+              text: "The contribution is $[amount].",
+            },
+          ],
+        },
       );
     return {
       kind: "proposal",
@@ -281,6 +370,42 @@ export function resolveActivity(
   if (!totalCents || !intent.dueDate)
     return clarify(
       `I don’t see a matching ${intent.bill} bill yet. What’s ${!totalCents && !intent.dueDate ? "the total bill amount and due date" : !totalCents ? "the total bill amount" : "the due date (including year)"}? The contribution is separate from the total.`,
+      {
+        placeholder:
+          !totalCents && !intent.dueDate
+            ? "What’s the full bill total and due date?"
+            : !totalCents
+              ? "What’s the full bill total?"
+              : "When is the bill due? Include the year.",
+        prompts: [
+          {
+            label:
+              !totalCents && !intent.dueDate
+                ? "Enter total & due date"
+                : !totalCents
+                  ? "Enter bill total"
+                  : "Enter due date",
+            text:
+              !totalCents && !intent.dueDate
+                ? "The total is $[total], due [YYYY-MM-DD]."
+                : !totalCents
+                  ? "The total bill amount is $[total]."
+                  : "The due date is [YYYY-MM-DD].",
+          },
+          {
+            label: "Use an attached bill",
+            text: "Use the attached bill’s total and due date for this contribution.",
+          },
+          ...(!totalCents && !intent.dueDate
+            ? [
+                {
+                  label: "Start with the total",
+                  text: "The total bill amount is $[total].",
+                },
+              ]
+            : []),
+        ],
+      },
     );
   const allocations = equalSplit(
     totalCents,

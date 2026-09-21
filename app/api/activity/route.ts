@@ -10,6 +10,8 @@ import { chooseActivity, prepareActivity } from "@/lib/server/activity";
 import { verifyActivity } from "@/lib/server/activity-token";
 import { interpretActivity } from "@/lib/server/activity-interpreter";
 import { activitySourcesSchema } from "@/lib/domain/activity-sources";
+import { promptPlaceholder } from "@/lib/domain/activity-prompts";
+import { DomainError } from "@/lib/domain/bills";
 import { normalizeName } from "@/lib/domain/activity";
 import type { ActivityMessage } from "@/lib/domain/activity-chat";
 export const runtime = "nodejs";
@@ -44,6 +46,10 @@ export async function POST(request: Request) {
       ? verifyActivity(body.token, user.id, householdId)
       : undefined;
     const text = body.messages[0].parts[0].text;
+    if (promptPlaceholder.test(text))
+      throw new DomainError(
+        "Fill in the highlighted details before sending this draft.",
+      );
     const stream = createUIMessageStream<ActivityMessage>({
       execute: async ({ writer }) => {
         writer.write({ type: "start" });

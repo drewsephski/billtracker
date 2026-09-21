@@ -4,7 +4,7 @@ import { DefaultChatTransport } from "ai";
 import Link from "next/link";
 import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Loader2 } from "lucide-react";
+import { ArrowUp, Loader2, Paperclip, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ActivitySources } from "@/components/activity-sources";
@@ -14,7 +14,15 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  ActivityStarters,
+  ActivityPromptChoices,
+} from "@/components/activity-prompts";
+import {
+  promptPlaceholder,
+  type ActivityPrompt,
+} from "@/lib/domain/activity-prompts";
 import { Heading, Text } from "@/components/ui/typography";
 import { dateLabel, money } from "@/lib/domain/bills";
 import type { ActivityReply } from "@/lib/domain/activity";
@@ -37,13 +45,15 @@ export function ActivityChat({
   );
   const [sources, setSources] = useState<ActivitySource[]>([]);
   const [sourceEpoch, setSourceEpoch] = useState(0);
+  const [referencesOpen, setReferencesOpen] = useState(false);
+  const [selectedChoice, setSelectedChoice] = useState<ActivityPrompt>();
   const [input, setInput] = useState("");
   const [reply, setReply] = useState<ActivityReply>();
   const [confirming, setConfirming] = useState(false);
   const [notice, setNotice] = useState("");
   const token = useRef<string | undefined>(undefined);
   const inFlight = useRef(false);
-  const composer = useRef<HTMLInputElement>(null);
+  const composer = useRef<HTMLTextAreaElement>(null);
   const result = useRef<HTMLDivElement>(null);
   const transport = useMemo(
     () =>
@@ -80,6 +90,23 @@ export function ActivityChat({
       },
     });
   const pending = status === "submitted" || status === "streaming";
+  function pick(prompt: ActivityPrompt) {
+    setInput(prompt.text);
+    setSelectedChoice(prompt.choice !== undefined ? prompt : undefined);
+    setNotice("");
+    if (reply?.kind === "success") setReply(undefined);
+    if (prompt.text.startsWith("Use the attached")) setReferencesOpen(true);
+    requestAnimationFrame(() => {
+      composer.current?.focus();
+      const placeholder = prompt.text.match(promptPlaceholder);
+      if (placeholder?.index !== undefined)
+        composer.current?.setSelectionRange(
+          placeholder.index,
+          placeholder.index + placeholder[0].length,
+        );
+      composer.current?.scrollIntoView({ block: "nearest" });
+    });
+  }
   function cancel() {
     void stop();
     token.current = undefined;
@@ -87,11 +114,17 @@ export function ActivityChat({
     setMessages([]);
     setNotice("Cancelled. Nothing was recorded.");
     setInput("");
+    setSelectedChoice(undefined);
+    setReferencesOpen(false);
     setSources([]);
     setSourceEpoch((value) => value + 1);
   }
   async function send(text: string, choice?: number) {
-    if (!text.trim() || pending || confirming) return;
+    if (!text.trim() || pending || confirming || promptPlaceholder.test(text))
+      return;
+    choice ??=
+      selectedChoice?.text === text ? selectedChoice.choice : undefined;
+    setSelectedChoice(undefined);
     const context = token.current;
     setNotice("");
     setReply(undefined);
@@ -118,6 +151,7 @@ export function ActivityChat({
         if (next.kind === "success") {
           setMessages([]);
           setSources([]);
+          setReferencesOpen(false);
           setSourceEpoch((value) => value + 1);
           router.refresh();
         }
@@ -144,10 +178,13 @@ export function ActivityChat({
             first.
           </Text>
         </div>
-        {!messages.length && !reply && (
-          <Text small muted>
-            “I paid $40 toward internet” · “Allie paid $50 toward electricity”
-          </Text>
+        {!messages.length && (!reply || reply.kind === "success") && (
+          <ActivityStarters
+            key={sourceEpoch}
+            householdId={householdId}
+            disabled={!hydrated || pending || confirming}
+            onPick={pick}
+          />
         )}
         <div
           className="max-h-64 min-w-0 space-y-3 overflow-y-auto overscroll-contain"
@@ -165,7 +202,7 @@ export function ActivityChat({
                   {m.role === "assistant" ? (
                     <>
                       <p className="mb-2 text-xs text-muted-foreground">
-                        Draft notes · review the details below
+                        From your sources · review before confirming
                       </p>
                       <MessageResponse
                         isAnimating={pending && m.id === messages.at(-1)?.id}
@@ -188,7 +225,7 @@ export function ActivityChat({
           aria-atomic="true"
         >
           {pending && (
-            <Text small muted className="flex items-center gap-2">
+            <Text small muted className="flex items-end gap-2">
               <Loader2 className="size-4 motion-safe:animate-spin" />
               Preparing the details…
             </Text>
@@ -198,21 +235,24 @@ export function ActivityChat({
               {reply.message}
             </Text>
           )}
-          {reply?.choices && (
-            <div className="flex flex-col gap-2">
-              {reply.choices.map((choice, i) => (
-                <Button
-                  key={i}
-                  variant="outline"
-                  className="min-h-11 h-auto justify-start whitespace-normal text-left"
-                  disabled={pending || confirming}
-                  onClick={() => void send(choice, i)}
-                >
-                  {choice}
-                </Button>
-              ))}
-            </div>
-          )}
+          {!pending &&
+            !p &&
+            (reply?.choices || reply?.guidance?.prompts.length) && (
+              <ActivityPromptChoices
+                compact
+                disabled={confirming}
+                onPick={pick}
+                prompts={
+                  reply.choices?.map((choice, i) => ({
+                    label: choice,
+                    text: choice,
+                    choice: i,
+                  })) ??
+                  reply.guidance?.prompts ??
+                  []
+                }
+              />
+            )}
           {p && (
             <div
               className="space-y-3 rounded-xl border bg-background/70 p-4"
@@ -284,43 +324,93 @@ export function ActivityChat({
         </div>
         {!p && (
           <form
-            className="flex items-center gap-2"
+            className="flex items-end gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               void send(input);
             }}
           >
-            <Input
+            <Textarea
               ref={composer}
               aria-label="Describe bill activity"
-              placeholder="What happened?"
+              placeholder={
+                reply?.guidance?.placeholder ??
+                (reply?.choices
+                  ? "Choose an option above, or clarify…"
+                  : "Tell me what happened…")
+              }
               value={input}
               maxLength={1000}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                setSelectedChoice(undefined);
+              }}
+              onKeyDown={(e) => {
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing
+                ) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
+              rows={2}
               disabled={!hydrated || pending || confirming}
               enterKeyHint="send"
               autoComplete="off"
-              className="min-h-12 min-w-0 text-base"
+              className="max-h-40 min-h-16 min-w-0 resize-none text-base md:text-base"
             />
             <Button
               type="submit"
               size="icon"
               className="size-12 shrink-0"
-              disabled={!hydrated || pending || confirming || !input.trim()}
+              disabled={
+                !hydrated ||
+                pending ||
+                confirming ||
+                !input.trim() ||
+                promptPlaceholder.test(input)
+              }
               aria-label="Send activity"
             >
               <ArrowUp />
             </Button>
           </form>
         )}
+        {!p && promptPlaceholder.test(input) && (
+          <Text small muted role="status">
+            Replace the bracketed details with the actual amounts and date.
+          </Text>
+        )}
         {!p && (
-          <ActivitySources
-            key={sourceEpoch}
-            householdId={householdId}
-            sources={sources}
-            onChange={setSources}
-            disabled={!hydrated || pending || confirming}
-          />
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="min-h-11 text-muted-foreground"
+              aria-expanded={referencesOpen}
+              aria-controls="activity-references"
+              disabled={pending || confirming}
+              onClick={() => setReferencesOpen(!referencesOpen)}
+            >
+              <Paperclip className="size-4" />{" "}
+              {sources.length
+                ? `${sources.length} attached ${sources.length === 1 ? "source" : "sources"}`
+                : "Add a bill or source"}{" "}
+              <ChevronDown className="size-3" />
+            </Button>
+            <div id="activity-references" hidden={!referencesOpen}>
+              <ActivitySources
+                key={sourceEpoch}
+                householdId={householdId}
+                sources={sources}
+                onChange={setSources}
+                disabled={!hydrated || pending || confirming}
+              />
+            </div>
+          </div>
         )}
         {!p && (pending || messages.length > 0) && (
           <Button

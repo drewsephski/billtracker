@@ -33,6 +33,7 @@ export function activityReply(
       kind: r.kind,
       message: notice ? `${notice} ${r.message}` : r.message,
       choices: r.choices?.map((c) => c.label),
+      guidance: r.guidance,
       token,
     };
   const p = r.proposal;
