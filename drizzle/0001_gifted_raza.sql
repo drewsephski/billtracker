@@ -1,0 +1,2 @@
+ALTER TABLE "bills" DROP CONSTRAINT "bill_occurrence";--> statement-breakpoint
+ALTER TABLE "bills" ADD CONSTRAINT "bill_occurrence" CHECK (("bills"."template_id" is null and "bills"."period" is null) or ("bills"."template_id" is not null and "bills"."period" ~ '^[0-9]{4}-[0-9]{2}$'));
