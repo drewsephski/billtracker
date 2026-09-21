@@ -3,6 +3,7 @@ import { AnimatedIcon } from "@/components/icons/animated-icon";
 import Link from "next/link";
 import {
   useActionState,
+  useEffect,
   useState,
   useTransition,
   useSyncExternalStore,
@@ -383,6 +384,12 @@ export function AcceptForm({
 export function VerifyForm({ next = "/dashboard" }: { next?: string }) {
   const [sent, send, sending] = useActionState(sendVerification, {});
   const [verified, verify, verifying] = useActionState(verifyEmail, {});
+  const [codeRequested, setCodeRequested] = useState(false);
+
+  useEffect(() => {
+    if (sent.success) setCodeRequested(true);
+  }, [sent.success]);
+
   return (
     <div className="flex flex-col gap-6">
       <form action={send}>
@@ -392,27 +399,33 @@ export function VerifyForm({ next = "/dashboard" }: { next?: string }) {
           <Submit pending={sending}>Email me a verification code</Submit>
         </FieldGroup>
       </form>
-      <form action={verify}>
-        <input type="hidden" name="next" value={invitationDestination(next)} />
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="otp">Six-digit code</FieldLabel>
-            <Input
-              id="otp"
-              name="otp"
-              inputMode="numeric"
-              className="text-center text-xl tracking-[0.35em]"
-              placeholder="000000"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              required
-            />
-          </Field>
-          <Feedback state={verified} />
-          <Submit pending={verifying}>Verify and continue</Submit>
-        </FieldGroup>
-      </form>
+      {codeRequested && (
+        <form action={verify}>
+          <input
+            type="hidden"
+            name="next"
+            value={invitationDestination(next)}
+          />
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="otp">Six-digit code</FieldLabel>
+              <Input
+                id="otp"
+                name="otp"
+                inputMode="numeric"
+                className="text-center text-xl tracking-[0.35em]"
+                placeholder="000000"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                required
+              />
+            </Field>
+            <Feedback state={verified} />
+            <Submit pending={verifying}>Verify and continue</Submit>
+          </FieldGroup>
+        </form>
+      )}
     </div>
   );
 }

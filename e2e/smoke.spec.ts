@@ -144,6 +144,10 @@ test("real Neon signup → household → invitation → bill → individual paym
   await expect(
     roommate.getByRole("button", { name: "Join household" }),
   ).toHaveCount(0);
+  await expect(roommate.getByLabel("Six-digit code")).toHaveCount(0);
+  await roommate
+    .getByRole("button", { name: "Email me a verification code" })
+    .click();
   await expect(roommate.getByLabel("Six-digit code")).toBeVisible();
   // Test fixture: verify the reserved example.com account on the dev branch only.
   // Email delivery itself is deliberately not simulated as an end-to-end pass.
