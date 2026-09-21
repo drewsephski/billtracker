@@ -5,7 +5,11 @@ import { interpretActivity } from "@/lib/server/activity-interpreter";
 // Explicitly opt in. Synthetic fixtures only; no household data or database access.
 const enabled = process.env.RUN_LIVE_MODEL_TESTS === "1";
 if (enabled) loadEnvFile(".env.local");
-const models = (process.env.LIVE_MODELS ?? "z-ai/glm-5.3-flash").split(",");
+const models = (
+  process.env.LIVE_MODELS ??
+  process.env.OPENROUTER_MODEL ??
+  "openai/gpt-5.6-luna"
+).split(",");
 describe.skipIf(!enabled)("live OpenRouter task evaluation", () => {
   for (const model of models) {
     it.each([

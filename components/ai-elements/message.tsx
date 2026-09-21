@@ -45,6 +45,9 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 // Draft output must not cause remote requests or invent actionable source links.
 const safeComponents: NonNullable<MessageResponseProps["components"]> = {
   img: () => null,
+  strong: ({ children }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
   a: ({ children }) => (
     <span className="underline decoration-muted-foreground/40">{children}</span>
   ),
