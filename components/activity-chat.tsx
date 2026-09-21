@@ -2,7 +2,13 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import Link from "next/link";
-import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, Loader2, Paperclip, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +41,11 @@ import {
 } from "@/lib/demo-activity";
 
 const subscribeToHydration = () => () => {};
+const demoKeyByLabel: Record<string, DemoActivityKey> = {
+  "Record my contribution": "own-share",
+  "Set up a shared bill": "new-bill",
+  "Record Emma’s contribution": "roommate-share",
+};
 
 export function ActivityChat({
   householdId,
@@ -62,10 +73,12 @@ export function ActivityChat({
   const [confirming, setConfirming] = useState(false);
   const [notice, setNotice] = useState("");
   const [demoKey, setDemoKey] = useState<DemoActivityKey>();
+  const [demoStreaming, setDemoStreaming] = useState(false);
   const token = useRef<string | undefined>(undefined);
   const inFlight = useRef(false);
   const composer = useRef<HTMLTextAreaElement>(null);
   const result = useRef<HTMLDivElement>(null);
+  const demoStreamTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transport = useMemo(
     () =>
       new DefaultChatTransport<ActivityMessage>({
@@ -101,23 +114,22 @@ export function ActivityChat({
       },
     });
   const pending = status === "submitted" || status === "streaming";
+  const activityPending = pending || demoStreaming;
+  useEffect(
+    () => () => {
+      if (demoStreamTimer.current) clearTimeout(demoStreamTimer.current);
+    },
+    [],
+  );
+  function stopDemoStream() {
+    if (demoStreamTimer.current) clearTimeout(demoStreamTimer.current);
+    demoStreamTimer.current = null;
+    setDemoStreaming(false);
+  }
   function pick(prompt: ActivityPrompt) {
     setInput(prompt.text);
     setSelectedChoice(prompt.choice !== undefined ? prompt : undefined);
-    if (demo) {
-      const nextKey = demoActivityPrompts.find(
-        (candidate) => candidate.label === prompt.label,
-      );
-      setDemoKey(
-        nextKey
-          ? nextKey.label === "Record my contribution"
-            ? "own-share"
-            : nextKey.label === "Set up a shared bill"
-              ? "new-bill"
-              : "roommate-share"
-          : undefined,
-      );
-    }
+    if (demo) setDemoKey(demoKeyByLabel[prompt.label]);
     setNotice("");
     if (reply?.kind === "success") setReply(undefined);
     if (prompt.text.startsWith("Use the attached")) setReferencesOpen(true);
@@ -134,6 +146,7 @@ export function ActivityChat({
   }
   function cancel() {
     void stop();
+    stopDemoStream();
     token.current = undefined;
     setReply(undefined);
     setMessages([]);
@@ -183,10 +196,35 @@ export function ActivityChat({
         },
       ];
       setMessages(previewMessages);
-      setReply(preview);
+      setReply(undefined);
       setInput("");
       setDemoKey(undefined);
       setNotice("");
+      setDemoStreaming(true);
+      let cursor = 0;
+      const stream = () => {
+        cursor = Math.min(cursor + 2, preview.message.length);
+        setMessages((current) =>
+          current.map((message, index) =>
+            index === current.length - 1
+              ? {
+                  ...message,
+                  parts: [
+                    { type: "text" as const, text: preview.message.slice(0, cursor) },
+                  ],
+                }
+              : message,
+          ),
+        );
+        if (cursor >= preview.message.length) {
+          demoStreamTimer.current = null;
+          setDemoStreaming(false);
+          setReply(preview);
+          return;
+        }
+        demoStreamTimer.current = setTimeout(stream, 24);
+      };
+      demoStreamTimer.current = setTimeout(stream, 80);
       return;
     }
     choice ??=
@@ -286,10 +324,18 @@ export function ActivityChat({
                         Source summary
                       </p>
                       <MessageResponse
-                        isAnimating={pending && m.id === messages.at(-1)?.id}
+                        isAnimating={
+                          activityPending && m.id === messages.at(-1)?.id
+                        }
                       >
                         {text}
                       </MessageResponse>
+                      {demoStreaming && m.id === messages.at(-1)?.id && (
+                        <span
+                          aria-hidden
+                          className="mt-1 inline-block h-4 w-0.5 bg-primary motion-safe:animate-pulse"
+                        />
+                      )}
                     </>
                   ) : (
                     <p className="whitespace-pre-wrap break-words">{text}</p>
@@ -305,10 +351,12 @@ export function ActivityChat({
           aria-live="polite"
           aria-atomic="true"
         >
-          {pending && (
+          {activityPending && (
             <Text small muted className="flex items-start gap-2">
               <Loader2 className="size-4 motion-safe:animate-spin" />
-              Checking your activity…
+              {demoStreaming
+                ? "Homeshare is checking the household…"
+                : "Checking your activity…"}
             </Text>
           )}
           {reply && (
@@ -316,7 +364,7 @@ export function ActivityChat({
               {reply.message}
             </Text>
           )}
-          {!pending &&
+          {!activityPending &&
             !p &&
             (reply?.choices || reply?.guidance?.prompts.length) && (
               <ActivityPromptChoices
@@ -337,7 +385,7 @@ export function ActivityChat({
           {p && (
             <ActivityConfirmation
               p={p}
-              disabled={confirming || pending || demo}
+              disabled={confirming || activityPending || demo}
               onConfirm={demo ? undefined : () => void confirm()}
               onCancel={demo ? resetDemo : cancel}
             />
@@ -401,7 +449,7 @@ export function ActivityChat({
                 setSelectedChoice(undefined);
               }}
               onSend={() => void send(input)}
-              disabled={!hydrated || pending || confirming}
+              disabled={!hydrated || activityPending || confirming}
             />
             <Button
               type="submit"
@@ -409,7 +457,7 @@ export function ActivityChat({
               className="size-12 shrink-0"
               disabled={
                 !hydrated ||
-                pending ||
+                activityPending ||
                 confirming ||
                 !input.trim() ||
                 promptPlaceholder.test(input)
@@ -456,7 +504,7 @@ export function ActivityChat({
                 householdId={householdId}
                 sources={sources}
                 onChange={setSources}
-                disabled={!hydrated || pending || confirming}
+                disabled={!hydrated || activityPending || confirming}
               />
             </div>
           </div>

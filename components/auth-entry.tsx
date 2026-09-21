@@ -25,6 +25,7 @@ export async function AuthEntry({
   return (
     <PublicShell
       variant={mode === "sign-up" && !invite ? "home" : "key"}
+      showInviteLink
       title={
         invite
           ? `${mode === "sign-in" ? "Sign in" : "Create an account"} to join ${invite.name}.`

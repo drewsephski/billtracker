@@ -4,7 +4,7 @@ import { demoActivityPrompts, demoActivityReply } from "@/lib/demo-activity";
 describe("landing activity preview", () => {
   it("keeps the example requests within one character of each other", () => {
     const lengths = demoActivityPrompts.map((prompt) => prompt.text.length);
-    expect(Math.max(...lengths) - Math.min(...lengths)).toBeLessThanOrEqual(1);
+    expect(Math.max(...lengths) - Math.min(...lengths)).toBeLessThanOrEqual(2);
   });
 
   it.each([

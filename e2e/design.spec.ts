@@ -23,7 +23,7 @@ test("public activity previews explain the review flow and link to the demo grou
     await page.getByRole("button", { name: /^Record my contribution/ }).click();
     await expect(
       page.getByRole("textbox", { name: "Describe bill activity" }),
-    ).toHaveValue("I paid $25 toward Internet this month. Done now!");
+    ).toHaveValue("I paid my $25 Internet share this month. It’s done!");
     await page
       .getByRole("button", { name: "Send activity", exact: true })
       .click();

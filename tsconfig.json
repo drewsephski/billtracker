@@ -36,7 +36,9 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     ".next-chat/types/**/*.ts",
-    ".next-chat/dev/types/**/*.ts"
+    ".next-chat/dev/types/**/*.ts",
+    ".next/ux-layout/types/**/*.ts",
+    ".next/ux-layout/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

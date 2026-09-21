@@ -8,6 +8,7 @@ export default async function Page({
   const { token, next } = await searchParams;
   return (
     <PublicShell
+      showInviteLink
       title={token ? "A fresh password." : "Request a new reset link."}
       description="Choose a password of at least eight characters."
     >

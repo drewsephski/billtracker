@@ -16,20 +16,29 @@ export function PublicShell({
   title,
   description,
   variant = "key",
+  showInviteLink = false,
   children,
 }: {
   title: string;
   description: string;
   variant?: BlobVariant;
+  showInviteLink?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="min-h-dvh">
       <header className="mx-auto flex max-w-7xl items-center justify-between p-5 sm:px-10">
         <Brand />
-        <Button variant="ghost" asChild>
-          <Link href="/demo">Take a peek</Link>
-        </Button>
+        <div className="flex items-center gap-1">
+          {showInviteLink && (
+            <Button variant="ghost" asChild>
+              <Link href="/join">Have an invite?</Link>
+            </Button>
+          )}
+          <Button variant="ghost" asChild>
+            <Link href="/demo">Take a peek</Link>
+          </Button>
+        </div>
       </header>
       <main className="mx-auto grid max-w-5xl items-center gap-10 px-5 py-5 md:grid-cols-[0.9fr_1.1fr] md:gap-16 md:py-12">
         <div className="hidden flex-col gap-7 md:flex">

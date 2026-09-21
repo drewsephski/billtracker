@@ -9,15 +9,15 @@ import { demoData } from "./demo";
 export const demoActivityPrompts = [
   {
     label: "Record my contribution",
-    text: "I paid $25 toward Internet this month. Done now!",
+    text: "I paid my $25 Internet share this month. It’s done!",
   },
   {
     label: "Set up a shared bill",
-    text: "Add a $90 household bill today. Split it equally.",
+    text: "Add a $90 household bill today. I paid my $30 share.",
   },
   {
     label: "Record Emma’s contribution",
-    text: "Emma paid $30.80 toward Gas for the month. Done.",
+    text: "Emma paid her $30.80 Gas share this month. All set!",
   },
 ] as const satisfies readonly ActivityPrompt[];
 

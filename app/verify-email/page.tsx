@@ -14,6 +14,7 @@ export default async function Page({
   if (user.emailVerified) redirect(next);
   return (
     <PublicShell
+      showInviteLink
       title="Let’s verify it’s you."
       description={`Request a code for ${user.email}, then enter it below.`}
     >
