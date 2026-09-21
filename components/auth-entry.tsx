@@ -8,9 +8,11 @@ import { getAuth } from "@/lib/server/auth";
 export async function AuthEntry({
   mode,
   next,
+  verified = false,
 }: {
   mode: "sign-in" | "sign-up";
   next?: string;
+  verified?: boolean;
 }) {
   const destination = invitationDestination(next);
   const joining = destination.startsWith("/join/");
@@ -41,7 +43,12 @@ export async function AuthEntry({
             : "A calmer way to keep up with shared bills starts here."
       }
     >
-      <AuthForm mode={mode} next={destination} email={invite?.email} />
+      <AuthForm
+        mode={mode}
+        next={destination}
+        email={invite?.email}
+        verified={verified}
+      />
     </PublicShell>
   );
 }

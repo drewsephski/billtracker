@@ -200,6 +200,35 @@ export async function sendVerification(
     return failure(e);
   }
 }
+export async function sendVerificationForEmail(
+  _state: ActionResult,
+  form: FormData,
+): Promise<ActionResult> {
+  void _state;
+  try {
+    const email = z.email().parse(form.get("email")).toLowerCase();
+    const result = await getAuth().emailOtp.sendVerificationOtp({
+      email,
+      type: "email-verification",
+    });
+    if (result.error) {
+      console.warn("Verification email request was not completed", {
+        error: result.error.message,
+      });
+    }
+  } catch (e) {
+    if (e instanceof z.ZodError)
+      return { error: e.issues[0]?.message || "Enter a valid email address." };
+    console.error(
+      "Public verification email request failed",
+      e instanceof Error ? e.name : "Unknown error",
+    );
+  }
+  return {
+    success:
+      "If that email has an unconfirmed account, a six-digit code is on its way.",
+  };
+}
 export async function verifyEmail(
   _state: ActionResult,
   form: FormData,
@@ -220,6 +249,44 @@ export async function verifyEmail(
   }
   revalidatePath("/", "layout");
   redirect(invitationDestination(form.get("next")));
+}
+export async function verifyEmailForEmail(
+  _state: ActionResult,
+  form: FormData,
+): Promise<ActionResult> {
+  void _state;
+  const safeNext = invitationDestination(form.get("next"));
+  try {
+    const values = z
+      .object({
+        email: z.email(),
+        otp: z.string().regex(/^\d{6}$/, "Enter the six-digit code."),
+      })
+      .parse({
+        email: form.get("email"),
+        otp: form.get("otp"),
+      });
+    const result = await getAuth().emailOtp.verifyEmail({
+      email: values.email.toLowerCase(),
+      otp: values.otp,
+    });
+    if (result.error)
+      return {
+        error: "That code didn’t work. Request a new code and try again.",
+      };
+  } catch (e) {
+    if (e instanceof z.ZodError)
+      return { error: e.issues[0]?.message || "Check your entries." };
+    console.error(
+      "Public email verification failed",
+      e instanceof Error ? e.name : "Unknown error",
+    );
+    return {
+      error: "That code didn’t work. Request a new code and try again.",
+    };
+  }
+  revalidatePath("/", "layout");
+  redirect(`/sign-in?verified=1&next=${encodeURIComponent(safeNext)}`);
 }
 export async function requestPasswordReset(
   _state: ActionResult,

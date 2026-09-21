@@ -3,8 +3,8 @@ export const metadata = { title: "Sign in" };
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; verified?: string }>;
 }) {
-  const { next } = await searchParams;
-  return <AuthEntry mode="sign-in" next={next} />;
+  const { next, verified } = await searchParams;
+  return <AuthEntry mode="sign-in" next={next} verified={verified === "1"} />;
 }
