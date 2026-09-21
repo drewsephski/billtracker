@@ -14,10 +14,14 @@ export async function proxy(request: NextRequest) {
   // dropping the upstream session_token renewal in @neondatabase/auth 0.5.0-beta.
   const url = new URL("/api/auth/get-session", request.url);
   url.searchParams.set("disableCookieCache", "true");
-  const sessionResponse = await getAuth().handler().GET(
-    new NextRequest(url, { headers: { cookie: request.headers.get("cookie")! } }),
-    { params: Promise.resolve({ path: ["get-session"] }) },
-  );
+  const sessionResponse = await getAuth()
+    .handler()
+    .GET(
+      new NextRequest(url, {
+        headers: { cookie: request.headers.get("cookie")! },
+      }),
+      { params: Promise.resolve({ path: ["get-session"] }) },
+    );
   if (!sessionResponse.ok) return NextResponse.next();
 
   const session = await sessionResponse.json();

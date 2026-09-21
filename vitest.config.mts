@@ -10,6 +10,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Bundle Neon's Next adapter so Vite resolves Next's extensionless imports.
+    server: { deps: { inline: ["@neondatabase/auth"] } },
     include: ["tests/**/*.test.ts"],
     testTimeout: 30000,
     hookTimeout: 30000,

@@ -102,10 +102,11 @@ test("real Neon signup → household → invitation → bill → individual paym
     .click();
   await page.getByLabel("Roommate’s email address").fill(roommateEmail);
   await page.getByRole("button", { name: "Create invite link" }).click();
-  const invitation = await page
+  const invitationLink = await page
     .getByLabel("Share this link directly with your roommate")
     .inputValue();
-  expect(invitation).toMatch(/\/join\/[a-f0-9]{64}$/);
+  expect(invitationLink).toMatch(/\/join\/[a-f0-9]{64}$/);
+  const invitation = new URL(new URL(invitationLink).pathname, page.url()).href;
   const context = await browser.newContext();
   const roommate = await context.newPage();
   await roommate.goto(invitation);
