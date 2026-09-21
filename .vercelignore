@@ -1,0 +1,8 @@
+/.next/
+/.next-chat/
+/node_modules/
+/.git/
+/.vercel/
+/test-results/
+/playwright-report/
+/coverage/
