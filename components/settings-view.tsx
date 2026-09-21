@@ -1,3 +1,4 @@
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import Link from "next/link";
 import {
   Card,
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Heading, Text, Eyebrow } from "@/components/ui/typography";
 import { HouseholdForm } from "./account-forms";
-import { ThemeToggle } from "./theme-toggle";
+import { ThemePreferenceControl } from "./theme-toggle";
 import { signOut } from "@/lib/server/actions";
 import type { HouseholdData } from "@/lib/domain/types";
 export function SettingsView({
@@ -64,7 +65,10 @@ export function SettingsView({
                     <Link href="/forgot-password">Reset password</Link>
                   </Button>
                   <form action={signOut}>
-                    <Button variant="ghost">Sign out</Button>
+                    <Button variant="ghost">
+                      <AnimatedIcon name="log-out" />
+                      Sign out
+                    </Button>
                   </form>
                 </>
               )}
@@ -74,11 +78,12 @@ export function SettingsView({
             <CardHeader>
               <CardTitle>Light or cozy?</CardTitle>
               <CardDescription>
-                Switch the appearance for this visit.
+                Follows your device by default. Your light or dark preference is
+                saved on this device.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ThemeToggle />
+              <ThemePreferenceControl />
             </CardContent>
           </Card>
           <Card>

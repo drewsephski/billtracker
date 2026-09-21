@@ -7,7 +7,7 @@ import {
   useTransition,
   useSyncExternalStore,
 } from "react";
-import { Copy, Check, Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,6 +28,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { invitationDestination } from "@/lib/domain/navigation";
 import { Text } from "@/components/ui/typography";
 import { Feedback } from "./feedback";
+import { InviteLinkActions } from "./invite-link-actions";
 import {
   acceptAction,
   authenticate,
@@ -159,7 +160,7 @@ export function AuthForm({
               aria-pressed={showPassword}
               onClick={() => setShowPassword(!showPassword)}
             >
-              {showPassword ? <EyeOff /> : <Eye />}
+              <AnimatedIcon name={showPassword ? "eye-off" : "eye"} />
             </Button>
           </div>
           <FieldDescription>
@@ -283,9 +284,6 @@ export function InviteForm({ householdId }: { householdId: string }) {
     inviteAction.bind(null, householdId),
     {},
   );
-  const [copiedUrl, setCopiedUrl] = useState<string>();
-  const [copyError, setCopyError] = useState<string>();
-  const copied = Boolean(state.url && copiedUrl === state.url);
   return (
     <form action={action}>
       <FieldGroup>
@@ -317,30 +315,7 @@ export function InviteForm({ householdId }: { householdId: string }) {
               value={state.url}
               onFocus={(e) => e.currentTarget.select()}
             />
-            <Button
-              variant="outline"
-              type="button"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(state.url!);
-                  setCopiedUrl(state.url);
-                  setCopyError(undefined);
-                } catch {
-                  setCopiedUrl(undefined);
-                  setCopyError(
-                    "Couldn’t copy the link. Select it above and copy it manually.",
-                  );
-                }
-              }}
-            >
-              {copied ? (
-                <Check data-icon="inline-start" />
-              ) : (
-                <Copy data-icon="inline-start" />
-              )}
-              {copied ? "Copied" : "Copy invitation"}
-            </Button>
-            {copyError && <Feedback state={{ error: copyError }} />}
+            <InviteLinkActions key={state.url} url={state.url} />
             <FieldDescription>
               Expires in 7 days. Creating another invitation for this email
               revokes the previous one.

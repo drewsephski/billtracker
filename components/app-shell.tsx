@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Reveal } from "./ui/motion";
 import { usePathname } from "next/navigation";
-import { Users, House, LogOut } from "lucide-react";
+import { Users, House } from "lucide-react";
 import { Brand } from "./brand";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -120,7 +120,7 @@ export function AppShell({
             {!demo && (
               <form action={signOut}>
                 <Button size="icon" variant="ghost" aria-label="Sign out">
-                  <LogOut />
+                  <AnimatedIcon name="log-out" />
                 </Button>
               </form>
             )}

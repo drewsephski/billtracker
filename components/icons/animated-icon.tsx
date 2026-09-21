@@ -18,7 +18,10 @@ import { PlusIcon } from "./lucide-animated/plus";
 import { CheckIcon } from "./lucide-animated/check";
 import { HeartHandshakeIcon } from "./lucide-animated/heart-handshake";
 
+import { actionIcons } from "./action-icons";
+
 const icons = {
+  ...actionIcons,
   "arrow-right": ArrowRightIcon,
   "arrow-up-right": ArrowUpRightIcon,
   "arrow-left": ArrowLeftIcon,

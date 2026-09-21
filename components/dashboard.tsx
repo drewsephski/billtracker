@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Heading, Text } from "@/components/ui/typography";
+import { GettingStarted } from "./getting-started";
 import { BillDialog } from "./bill-form";
 import { CategoryIcon, StatusBadge } from "./bill-card";
 import { Blob } from "./blob";
@@ -63,6 +64,9 @@ export function Dashboard({
           demo={demo}
         />
       </div>
+      {!demo && data.viewer.role === "owner" && (
+        <GettingStarted key={household.id} data={data} />
+      )}
       <section
         aria-label="Your balance"
         className="balance-surface grid grid-cols-[minmax(0,1fr)_28%] items-center gap-x-5 gap-y-6 overflow-hidden rounded-[1.75rem] p-5 sm:grid-cols-[minmax(0,1fr)_14rem] sm:p-8"

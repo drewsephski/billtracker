@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useActionState } from "react";
-import { Check, ChevronsUpDown, House, Plus } from "lucide-react";
+import { Check } from "lucide-react";
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -34,9 +35,9 @@ export function HouseholdSwitcher({
           aria-label={`Switch household, current: ${active?.name}`}
           className="min-w-0 max-w-full justify-between gap-2 px-2"
         >
-          <House className="shrink-0 text-primary" />
+          <AnimatedIcon name="home" className="text-primary" />
           <span className="truncate">{active?.name}</span>
-          <ChevronsUpDown className="shrink-0 text-muted-foreground" />
+          <AnimatedIcon name="chevron-down" className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -71,7 +72,7 @@ export function HouseholdSwitcher({
         <Separator className="my-2" />
         <Button asChild variant="ghost" className="w-full justify-start">
           <Link href="/onboarding?new=1">
-            <Plus />
+            <AnimatedIcon name="plus" />
             Create a household
           </Link>
         </Button>

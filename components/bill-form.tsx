@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useBillEditorViewport } from "./use-bill-editor-viewport";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Pencil, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -59,6 +59,7 @@ export function BillDialog({
   bill,
   template,
   demo = false,
+  triggerLabel,
 }: {
   householdId: string;
   members: MemberView[];
@@ -66,6 +67,7 @@ export function BillDialog({
   bill?: BillView;
   template?: TemplateView;
   demo?: boolean;
+  triggerLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -73,21 +75,29 @@ export function BillDialog({
       <DialogTrigger asChild>
         <Button
           variant={bill || template ? "outline" : "default"}
-          size={bill || template ? "default" : "icon"}
+          size={bill || template || triggerLabel ? "default" : "icon"}
           className={
-            bill || template
+            bill || template || triggerLabel
               ? undefined
               : "size-12 gap-0 p-0 sm:h-11 sm:w-auto sm:gap-2 sm:px-4"
           }
-          aria-label={bill ? "Edit bill" : template ? "Manage" : "Add a bill"}
+          aria-label={
+            triggerLabel ||
+            (bill ? "Edit bill" : template ? "Manage" : "Add a bill")
+          }
         >
           {bill || template ? (
-            <Pencil data-icon="inline-start" />
+            <AnimatedIcon name="pencil" data-icon="inline-start" />
           ) : (
             <AnimatedIcon name="plus" />
           )}
-          <span className={bill || template ? undefined : "hidden sm:inline"}>
-            {bill ? "Edit bill" : template ? "Manage" : "Add a bill"}
+          <span
+            className={
+              bill || template || triggerLabel ? undefined : "hidden sm:inline"
+            }
+          >
+            {triggerLabel ||
+              (bill ? "Edit bill" : template ? "Manage" : "Add a bill")}
           </span>
         </Button>
       </DialogTrigger>

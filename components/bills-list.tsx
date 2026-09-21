@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -79,7 +79,7 @@ export function BillsList({
             onClick={() => setSearch("")}
             className="absolute right-1 top-0.5"
           >
-            <X />
+            <AnimatedIcon name="x" />
           </Button>
         )}
       </div>

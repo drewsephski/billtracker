@@ -69,7 +69,7 @@ export function HouseholdView({
             ))}
           </CardContent>
         </Card>
-        <Card className="bg-secondary/40">
+        <Card id="invite" className="scroll-mt-24 bg-secondary/40">
           <CardHeader>
             <Blob className="mb-2 size-28" />
             <CardTitle>Room for one more?</CardTitle>
