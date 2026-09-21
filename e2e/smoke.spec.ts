@@ -77,6 +77,7 @@ test("real Neon signup → household → invitation → bill → individual paym
   page,
   browser,
 }) => {
+  test.setTimeout(180_000);
   test.skip(
     process.env.SEED_ALLOWED !== "true",
     "Only runs against an explicitly designated development database.",
