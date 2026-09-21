@@ -89,6 +89,22 @@ test("landing invitation entry opens the public join form", async ({
   ).toBeVisible();
 });
 
+test("auth pages keep the invitation entry point available", async ({
+  page,
+}) => {
+  for (const path of [
+    "/sign-in",
+    "/sign-up",
+    "/forgot-password",
+    "/reset-password",
+  ]) {
+    await page.goto(path);
+    await expect(
+      page.getByRole("link", { name: "Have an invite?", exact: true }),
+    ).toHaveAttribute("href", "/join");
+  }
+});
+
 test("bill date picker fits mobile and preserves calendar dates across time zones", async ({
   browser,
 }, testInfo) => {

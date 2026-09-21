@@ -35,7 +35,11 @@ export function PublicShell({
               <Link href="/join">Have an invite?</Link>
             </Button>
           )}
-          <Button variant="ghost" asChild>
+          <Button
+            variant="ghost"
+            asChild
+            className={showInviteLink ? "hidden sm:inline-flex" : undefined}
+          >
             <Link href="/demo">Take a peek</Link>
           </Button>
         </div>

@@ -158,6 +158,7 @@ export function ActivityChat({
     setSourceEpoch((value) => value + 1);
   }
   function resetDemo() {
+    stopDemoStream();
     setMessages([]);
     setReply(undefined);
     setInput("");
@@ -173,7 +174,12 @@ export function ActivityChat({
     return undefined;
   }
   async function send(text: string, choice?: number) {
-    if (!text.trim() || pending || confirming || promptPlaceholder.test(text))
+    if (
+      !text.trim() ||
+      activityPending ||
+      confirming ||
+      promptPlaceholder.test(text)
+    )
       return;
     if (demo) {
       const key = demoKey ?? inferDemoKey(text);
@@ -192,7 +198,7 @@ export function ActivityChat({
         {
           id: `demo-activity-assistant-${stamp}`,
           role: "assistant",
-          parts: [{ type: "text", text: "Review prepared below." }],
+          parts: [{ type: "text", text: "" }],
         },
       ];
       setMessages(previewMessages);
@@ -210,7 +216,10 @@ export function ActivityChat({
               ? {
                   ...message,
                   parts: [
-                    { type: "text" as const, text: preview.message.slice(0, cursor) },
+                    {
+                      type: "text" as const,
+                      text: preview.message.slice(0, cursor),
+                    },
                   ],
                 }
               : message,
@@ -301,7 +310,7 @@ export function ActivityChat({
             <ActivityStarters
               key={sourceEpoch}
               householdId={householdId}
-              disabled={!hydrated || pending || confirming}
+              disabled={!hydrated || activityPending || confirming}
               onPick={pick}
             />
           ))}
@@ -489,7 +498,7 @@ export function ActivityChat({
               className="min-h-11 text-muted-foreground"
               aria-expanded={referencesOpen}
               aria-controls="activity-references"
-              disabled={pending || confirming}
+              disabled={activityPending || confirming}
               onClick={() => setReferencesOpen(!referencesOpen)}
             >
               <Paperclip className="size-4" />{" "}
@@ -509,7 +518,7 @@ export function ActivityChat({
             </div>
           </div>
         )}
-        {!p && (pending || messages.length > 0) && (
+        {!p && (activityPending || messages.length > 0) && (
           <Button
             variant="ghost"
             size="sm"
