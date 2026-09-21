@@ -61,11 +61,11 @@ export function AnimatedIcon({
   useEffect(() => {
     const element = elementRef.current;
     if (!element || reduced) return;
-    if (
-      animateOnMount &&
-      !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    )
-      controls.current?.startAnimation();
+    if (animateOnMount) {
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+        controls.current?.startAnimation();
+      return;
+    }
     const target =
       element.closest<HTMLElement>(
         "[data-animated-icon-trigger], a, button, summary, .action-surface, [data-slot=card], [data-slot=select-scroll-up-button], [data-slot=select-scroll-down-button]",

@@ -41,14 +41,14 @@ export function Feedback({ state }: { state: ActionResult }) {
         variant={state.error ? "destructive" : "default"}
         className={cn(
           success &&
-            "grid-cols-[auto_minmax(0,1fr)] items-center border-success/30 bg-success/5",
+            "grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 border-success/30 bg-success/5",
         )}
         role={state.error ? "alert" : "status"}
       >
         {state.error ? (
           <CircleAlert />
         ) : (
-          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
             <AnimatedIcon name="check" animateOnMount />
           </span>
         )}
