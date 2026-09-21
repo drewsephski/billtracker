@@ -42,7 +42,7 @@ test("public chat previews stay read-only and link to the demo group chat", asyn
       page.getByRole("log", { name: "Household messages" }),
     ).toContainText("Your Internet share is $25.");
     await page
-      .getByRole("textbox", { name: "Message your household" })
+      .getByRole("combobox", { name: "Message your household" })
       .fill("Hello, housemates!");
     await page
       .getByRole("button", { name: "Send message", exact: true })
