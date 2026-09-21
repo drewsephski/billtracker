@@ -170,7 +170,23 @@ export default function Home() {
         </section>
       </main>
       <footer className="flex flex-wrap items-center justify-between gap-4 border-t px-6 py-8 sm:px-12">
-        <Brand />
+        <div className="flex items-center gap-5">
+          <Brand />
+          <nav aria-label="Legal" className="flex gap-4 text-sm">
+            <Link
+              className="text-muted-foreground underline-offset-4 hover:underline"
+              href="/terms"
+            >
+              Terms
+            </Link>
+            <Link
+              className="text-muted-foreground underline-offset-4 hover:underline"
+              href="/privacy"
+            >
+              Privacy
+            </Link>
+          </nav>
+        </div>
         <Text small muted>
           For the people you share a roof with.
         </Text>

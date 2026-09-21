@@ -89,6 +89,20 @@ export function PublicShell({
           </Card>
         </Reveal>
       </main>
+      <footer className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-4 px-5 pb-8 text-sm sm:px-10">
+        <Link
+          className="text-muted-foreground underline-offset-4 hover:underline"
+          href="/terms"
+        >
+          Terms of Service
+        </Link>
+        <Link
+          className="text-muted-foreground underline-offset-4 hover:underline"
+          href="/privacy"
+        >
+          Privacy Policy
+        </Link>
+      </footer>
     </div>
   );
 }
