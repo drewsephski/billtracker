@@ -233,16 +233,58 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
     await page.getByLabel("Household activity chat").screenshot({
       path: `test-results/activity-editable-draft-${test.info().project.name}.png`,
     });
+    const openPlaceholder = async (token: string) => {
+      const input = page.getByLabel("Describe bill activity");
+      await input.evaluate((element) =>
+        window.scrollBy(
+          0,
+          element.getBoundingClientRect().top - window.innerHeight * 0.7,
+        ),
+      );
+      const rect = await page
+        .locator("mark")
+        .filter({ hasText: token })
+        .evaluate((element) => {
+          const fragment = Array.from(element.getClientRects()).at(-1)!;
+          return {
+            x: fragment.left + fragment.width / 2,
+            y: fragment.top + fragment.height / 2,
+            top: fragment.top,
+          };
+        });
+      if (test.info().project.name === "mobile-webkit")
+        await page.touchscreen.tap(rect.x, rect.y);
+      else await page.mouse.click(rect.x, rect.y);
+      const editor = page.getByRole("dialog");
+      await expect(editor).toBeVisible();
+      await expect(editor).toHaveAttribute("data-side", "top");
+      await expect
+        .poll(async () => {
+          const box = await editor.boundingBox();
+          return (
+            !!box &&
+            box.y + box.height <= rect.top + 1 &&
+            box.x >= 0 &&
+            box.x + box.width <= 390
+          );
+        })
+        .toBe(true);
+      return editor;
+    };
+    // Direct taps hit native textarea coordinates, including a wrapped token.
+    await openPlaceholder("[due date]");
+    await expect(page.getByRole("dialog").getByRole("grid")).toBeVisible();
+    // The calendar can cover the preceding line; its accessible field shortcut
+    // still switches straight to the amount without a separate dismissal.
     await details
       .getByRole("button", { name: "Bill total", exact: true })
       .click();
+    await expect(page.getByLabel("Bill total", { exact: true })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(
       details.getByRole("button", { name: "Bill total", exact: true }),
     ).toBeFocused();
-    await details
-      .getByRole("button", { name: "Bill total", exact: true })
-      .click();
+    await openPlaceholder("[total]");
     await page.getByLabel("Bill total", { exact: true }).fill("0");
     await page.getByRole("button", { name: "Apply", exact: true }).click();
     await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
@@ -253,9 +295,7 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
     await expect(page.getByLabel("Describe bill activity")).toHaveValue(
       "The total is $90, due [due date].",
     );
-    await details
-      .getByRole("button", { name: "Choose due date", exact: true })
-      .click();
+    await openPlaceholder("[due date]");
     const calendar = page.getByLabel("Choose due date", { exact: true });
     // No date is silently selected; the calendar starts at the household's today.
     const householdToday = new Intl.DateTimeFormat("en-CA", {

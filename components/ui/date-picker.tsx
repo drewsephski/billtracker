@@ -47,7 +47,6 @@ export function DatePicker({
   const value = controlledValue ?? localValue;
   const [open, setOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const selected = value ? calendarDate(value) : undefined;
   return (
     <>
       <input type="hidden" name={name} value={value} />
@@ -87,30 +86,50 @@ export function DatePicker({
           sideOffset={8}
           className="minimal-scrollbar z-[60] max-h-(--radix-popover-content-available-height) w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-2xl p-3"
         >
-          <Calendar
-            mode="single"
-            required
-            selected={selected}
-            defaultMonth={selected ?? calendarDate(today)}
-            today={calendarDate(today)}
-            onSelect={(date) => {
-              setValue(dateValue(date));
-              onValueChange?.(dateValue(date));
+          <DatePickerCalendar
+            value={value}
+            today={today}
+            onValueChange={(date) => {
+              setValue(date);
+              onValueChange?.(date);
               setOpen(false);
             }}
-            startMonth={calendarDate("2000-01-01")}
-            endMonth={calendarDate("2100-12-31")}
-            disabled={{
-              before: calendarDate("2000-01-01"),
-              after: calendarDate("2100-12-31"),
-            }}
-            captionLayout="dropdown"
-            autoFocus
-            className="w-full p-0"
-            classNames={{ root: "w-full" }}
           />
         </PopoverContent>
       </Popover>
     </>
+  );
+}
+
+// Shared calendar body for button-triggered and inline-anchored date editors.
+export function DatePickerCalendar({
+  value = "",
+  today,
+  onValueChange,
+}: {
+  value?: string;
+  today: string;
+  onValueChange: (value: string) => void;
+}) {
+  const selected = value ? calendarDate(value) : undefined;
+  return (
+    <Calendar
+      mode="single"
+      required
+      selected={selected}
+      defaultMonth={selected ?? calendarDate(today)}
+      today={calendarDate(today)}
+      onSelect={(date) => onValueChange(dateValue(date))}
+      startMonth={calendarDate("2000-01-01")}
+      endMonth={calendarDate("2100-12-31")}
+      disabled={{
+        before: calendarDate("2000-01-01"),
+        after: calendarDate("2100-12-31"),
+      }}
+      captionLayout="dropdown"
+      autoFocus
+      className="w-full p-0"
+      classNames={{ root: "w-full" }}
+    />
   );
 }
