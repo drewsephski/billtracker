@@ -11,7 +11,12 @@ if (process.env.HOMESHARE_E2E_LLM_STUB === "true") {
           : input.url;
     if (!url.startsWith("https://openrouter.ai/api/"))
       return originalFetch(input, init);
-    if (process.env.SEED_ALLOWED !== "true")
+    if (
+      process.env.SEED_ALLOWED !== "true" ||
+      !["development", "test"].includes(process.env.HOMESHARE_ENV) ||
+      process.env.NODE_ENV === "production" ||
+      process.env.VERCEL_ENV === "production"
+    )
       throw new Error(
         "LLM stub requires the designated development environment",
       );

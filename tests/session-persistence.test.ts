@@ -148,6 +148,30 @@ describe("browser session persistence through the real Neon SDK", () => {
     );
   });
 
+  it.each([false, true])(
+    "sanitizes failed OAuth verifier exchange (challenge=%s)",
+    async (challenge) => {
+      upstream.mockResolvedValue(new Response(null, { status: 400 }));
+      const response = await proxy(
+        new NextRequest(
+          `https://homeshare.example.com/join/${"a".repeat(64)}?neon_auth_session_verifier=private&error_description=private`,
+          {
+            headers: challenge
+              ? { cookie: "__Secure-neon-auth.session_challenge=challenge" }
+              : {},
+          },
+        ),
+      );
+      const destination = new URL(response.headers.get("location")!);
+      expect(destination.pathname).toBe("/sign-in");
+      expect(destination.searchParams.get("error")).toBe("invalid_callback");
+      expect(destination.searchParams.get("next")).toBe(
+        `/join/${"a".repeat(64)}`,
+      );
+      expect(destination.href).not.toContain("private");
+    },
+  );
+
   it("refreshes account pages without intercepting APIs, the demo, or assets", () => {
     for (const url of ["/", "/sign-in", "/sign-up", "/join/token", "/bills/id"])
       expect(unstable_doesMiddlewareMatch({ config, url })).toBe(true);

@@ -15,7 +15,8 @@
     "format:check": "prettier --check .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx --conditions=react-server scripts/seed.ts"
+    "db:seed": "tsx --conditions=react-server scripts/seed.ts",
+    "release:check": "tsx scripts/release-check.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.110",

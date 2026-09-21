@@ -1,15 +1,20 @@
 "use client";
 
-import { createAuthClient } from "@neondatabase/auth/next";
+import { authClient } from "@/lib/client/auth";
+import { oauthErrorMessage } from "@/lib/domain/auth-errors";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Feedback } from "@/components/feedback";
 import type { ActionResult } from "@/lib/domain/types";
 
-const authClient = createAuthClient();
-
-export function GoogleSignIn({ callbackURL }: { callbackURL: string }) {
+export function GoogleSignIn({
+  callbackURL,
+  mode = "sign-in",
+}: {
+  callbackURL: string;
+  mode?: "sign-in" | "sign-up";
+}) {
   const [state, setState] = useState<ActionResult>({});
   const [pending, setPending] = useState(false);
 
@@ -20,10 +25,12 @@ export function GoogleSignIn({ callbackURL }: { callbackURL: string }) {
       const result = await authClient.signIn.social({
         provider: "google",
         callbackURL,
+        errorCallbackURL: `/${mode}?next=${encodeURIComponent(callbackURL)}`,
       });
-      if (result.error) setState({ error: result.error.message });
+      if (result.error)
+        setState({ error: oauthErrorMessage(result.error.code || "unknown") });
     } catch {
-      setState({ error: "Google sign-in is temporarily unavailable." });
+      setState({ error: oauthErrorMessage("unknown") });
     } finally {
       setPending(false);
     }

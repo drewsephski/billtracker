@@ -14,15 +14,10 @@ import { saveBill, recordPayment } from "../lib/server/bills";
 import { readHousehold } from "../lib/server/queries";
 import { todayInZone } from "../lib/domain/bills";
 import type { Identity } from "../lib/server/auth";
+import { assertDevelopmentWrites } from "../lib/release/development-guard";
 loadEnvConfig(process.cwd());
 async function main() {
-  if (
-    process.env.SEED_ALLOWED !== "true" ||
-    process.env.VERCEL_ENV === "production"
-  )
-    throw new Error(
-      "Seed only a development Neon branch with SEED_ALLOWED=true.",
-    );
+  assertDevelopmentWrites(process.env, true);
   const baseUrl = process.env.NEON_AUTH_BASE_URL;
   if (!baseUrl) throw new Error("NEON_AUTH_BASE_URL is required.");
   if (existsSync(".env.seed")) {

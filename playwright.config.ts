@@ -1,7 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
+import { assertDevelopmentWrites } from "./lib/release/development-guard";
 import { existsSync } from "node:fs";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 if (existsSync(".env.seed")) process.loadEnvFile(".env.seed");
+if (process.env.SEED_ALLOWED === "true")
+  assertDevelopmentWrites(process.env, true);
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,

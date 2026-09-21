@@ -21,7 +21,7 @@ vi.mock("@/lib/server/chat-ai", () => ({
 vi.mock("@/lib/server/activity-interpreter", () => ({
   interpretActivity: chatAI.interpret,
 }));
-import { loadEnvConfig } from "@next/env";
+import { assertDevelopmentWrites } from "@/lib/release/development-guard";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb, closeDb } from "@/lib/db";
@@ -44,8 +44,9 @@ import { readHousehold } from "@/lib/server/queries";
 import { generateInTransaction } from "@/lib/server/recurrence";
 import type { Identity } from "@/lib/server/auth";
 if (process.env.RUN_DB_TESTS === "1") process.loadEnvFile(".env.local");
-loadEnvConfig(process.cwd());
+
 const enabled = process.env.RUN_DB_TESTS === "1";
+if (enabled) assertDevelopmentWrites(process.env);
 describe.skipIf(!enabled)(
   "real Postgres tenant boundaries and transactional lifecycle",
   () => {
@@ -92,10 +93,7 @@ describe.skipIf(!enabled)(
       ...extra,
     });
     beforeAll(async () => {
-      if (process.env.SEED_ALLOWED !== "true")
-        throw new Error(
-          "Integration tests require an explicitly designated development database (SEED_ALLOWED=true).",
-        );
+      assertDevelopmentWrites(process.env);
       householdId = await createHousehold(owner, {
         name: "Integration household",
         timeZone: "America/Chicago",

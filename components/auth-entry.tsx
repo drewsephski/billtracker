@@ -8,11 +8,11 @@ import { getAuth } from "@/lib/server/auth";
 export async function AuthEntry({
   mode,
   next,
-  verified = false,
+  oauthError,
 }: {
   mode: "sign-in" | "sign-up";
   next?: string;
-  verified?: boolean;
+  oauthError?: string;
 }) {
   const destination = invitationDestination(next);
   const joining = destination.startsWith("/join/");
@@ -20,10 +20,16 @@ export async function AuthEntry({
     ? await invitationPreview(destination.split("/").at(-1)!)
     : null;
   if (joining && !invite) return <InvitationUnavailable />;
-  const { data } = await getAuth().getSession({
-    query: { disableCookieCache: "true" },
-  });
-  if (data?.user) redirect(destination);
+  let signedIn = false;
+  try {
+    const { data, error } = await getAuth().getSession({
+      query: { disableCookieCache: "true" },
+    });
+    signedIn = !error && !!data?.user;
+  } catch {
+    // Recovery controls remain available during an auth-provider outage.
+  }
+  if (signedIn && !oauthError) redirect(destination);
   return (
     <PublicShell
       variant={mode === "sign-up" && !invite ? "home" : "key"}
@@ -47,7 +53,7 @@ export async function AuthEntry({
         mode={mode}
         next={destination}
         email={invite?.email}
-        verified={verified}
+        oauthError={oauthError}
       />
     </PublicShell>
   );

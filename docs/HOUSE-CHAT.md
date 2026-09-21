@@ -105,6 +105,8 @@ Other tabs reject stale household headers and refresh before further work.
   pnpm exec playwright test e2e/activity.spec.ts
   ```
 
+Before running any authenticated/write browser test, configure every development/auth endpoint safeguard in [RELEASE.md](RELEASE.md), including `TEST_APP_ORIGIN` matching `E2E_BASE_URL`. Never run these suites against the live branch.
+
 Use the temporary certificate setup in `ACTIVITY-CHAT.md`; HTTPS is required
 for WebKit secure cookies. The separate build directory keeps concurrent local
 development independent.

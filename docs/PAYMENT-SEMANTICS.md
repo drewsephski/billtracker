@@ -1,23 +1,21 @@
 # Payment semantics: roommate settlement and provider payments
 
-**Current implementation:** The confirmed activity feature adds partial roommate contributions in migration 0004. Active contributions are summed per split, and manual “Mark paid” settles the remainder. Reversal targets one payment record. Provider payments and advances remain unsupported. See [ACTIVITY-CHAT.md](./ACTIVITY-CHAT.md). The source audit below describes the earlier full-share implementation and is retained as historical context.
-
-This is a source audit of HEAD `7203db7` and the mobile release slice. No financial schema, status rules, or balance calculation changes are implemented here.
+This report reflects the current partial-contribution model (migrations 0000–0006). Provider-payment tracking and the alternative dashboard calculations below remain proposals, not implemented features.
 
 ## What the app currently records
 
-`lib/db/schema.ts` defines `bills` (total, due date, creator, template/period), `bill_splits` (member obligation), and `payments` (full-share settlement, recorder, recorded time and optional reversal). There is no provider-payment field, provider-payee record, transfer recipient, actual bank transaction, or provider payment date. `created_by` identifies who entered a bill, not who paid the utility. `recorded_by` identifies who recorded a roommate settlement, not its recipient. The app cannot establish whether the provider was paid.
+`lib/db/schema.ts` defines `bills` (total, due date, creator, template/period), `bill_splits` (member obligation), and `payments` (positive partial contributions, recorder, recorded time and optional reversal). There is no provider-payment field, provider-payee record, transfer recipient, actual bank transaction, or provider payment date. `created_by` identifies who entered a bill, not who paid the utility. `recorded_by` identifies who recorded a roommate settlement, not its recipient. The app cannot establish whether the provider was paid.
 
-`lib/server/bills.ts` records a complete share, under the bill lock. Owners can record any share; members only their own. The unique active-payment index and `drizzle/0002_financial_invariants.sql` constrain each active payment to the split amount. Reversing a payment preserves the row and removes its settlement effect. Even reversed history prevents financial edits.
+`lib/server/bills.ts` records a validated positive contribution under the bill lock; omitting the amount settles the remaining share. Owners can record any share; members only their own. Migration 0004 replaces the one-active-payment index/exact-share rule with an aggregate cap, immutable history and immutable settled-share triggers. Reversing a payment preserves the row and removes its settlement effect. Even reversed history prevents financial edits.
 
-`lib/server/queries.ts` selects the non-reversed payment per split, sets each split's `paidCents`, and sums those values into the bill's `paidCents`. `lib/domain/bills.ts:billStatus` then applies this exact precedence:
+`lib/server/queries.ts` sums all non-reversed contributions per split, sets each split's `paidCents`, and sums those values into the bill's `paidCents`. `lib/domain/bills.ts:billStatus` then applies this exact precedence:
 
 1. Sum of roommate settlements >= bill total: **paid**, regardless of due date.
 2. Outstanding and due date before household-local today: **overdue**, even if partly settled.
 3. Some roommate settlement recorded: **partially paid**, including future-due bills.
 4. Nothing settled: **upcoming** if future-due, otherwise **unpaid** (due today).
 
-Zero-cent shares have nothing to settle. Individual partial settlements are unsupported. The household-month progress, bill badges, overdue warning, recent activity and personal balance therefore describe roommate settlement, not utility-provider payment.
+Zero-cent shares have nothing to settle. Partial settlements are supported. The household-month progress, bill badges, overdue warning, recent activity and personal balance therefore describe roommate settlement, not utility-provider payment.
 
 ## UX consequences
 
@@ -36,7 +34,7 @@ These confirmation fields represent current state only. For auditable correction
 
 ### Migration and history
 
-Use a new reviewed additive migration **after 0003**; do not rewrite 0002/0003 or any `neon_auth` tables. Start existing bills with unknown provider status (null confirmations); never backfill provider-paid from roommate settlements. Preserve all splits, payments, reversals, template instances and financial locks. Old bills retain their exact roommate settlement history; their provider state simply reads “Not recorded.” New recurring instances start unknown as well.
+Use a new reviewed additive migration **after 0006**; do not rewrite existing migrations or any `neon_auth` tables. Start existing bills with unknown provider status (null confirmations); never backfill provider-paid from roommate settlements. Preserve all splits, payments, reversals, template instances and financial locks. Old bills retain their exact roommate settlement history; their provider state simply reads “Not recorded.” New recurring instances start unknown as well.
 
 Authorize provider confirmations through `inHousehold`, derive the recorder from the session, validate dates, serialize through the bill lock and increment/check versions where needed. Decide whether provider confirmation history also forbids bill financial edits: the present `hasPaymentHistory` only covers split payments. Define who can confirm/undo and retain correction history before implementation. Validate the migration, tenant scoping, race handling, reversal/history, and unchanged split totals on a development branch before any production migration.
 

@@ -39,10 +39,8 @@ import {
   resetPassword,
   revokeAction,
   sendVerification,
-  sendVerificationForEmail,
   settingsAction,
   verifyEmail,
-  verifyEmailForEmail,
 } from "@/lib/server/actions";
 import type { ActionResult } from "@/lib/domain/types";
 const subscribeToTimeZone = () => () => {};
@@ -84,12 +82,12 @@ export function AuthForm({
   mode,
   next = "/dashboard",
   email,
-  verified = false,
+  oauthError,
 }: {
   mode: "sign-in" | "sign-up";
   next?: string;
   email?: string;
-  verified?: boolean;
+  oauthError?: string;
 }) {
   const [state, action, pending] = useActionState(
     authenticate.bind(null, mode),
@@ -183,14 +181,7 @@ export function AuthForm({
           </FieldDescription>
         </Field>
         <Feedback state={state} />
-        {verified && (
-          <Feedback
-            state={{
-              success:
-                "Email confirmed. Continue with Google to link this account.",
-            }}
-          />
-        )}
+        <Feedback state={{ error: oauthError }} />
         <div className="relative py-1">
           <div className="absolute inset-0 flex items-center" aria-hidden>
             <span className="w-full border-t" />
@@ -201,28 +192,12 @@ export function AuthForm({
             </span>
           </div>
         </div>
-        <GoogleSignIn callbackURL={invitationDestination(next)} />
+        <GoogleSignIn callbackURL={invitationDestination(next)} mode={mode} />
         {mode === "sign-in" && (
-          <div className="rounded-2xl border border-border/70 bg-muted/35 p-4 text-sm">
-            <p className="font-medium">Already have an email account?</p>
-            <p className="mt-1 text-muted-foreground">
-              Confirm your email first, then Google can sign you into the same
-              Homeshare account.
-            </p>
-            <Button
-              asChild
-              variant="link"
-              size="sm"
-              className="mt-2 h-auto p-0"
-            >
-              <Link
-                href={`/verify-email?lookup=1&next=${encodeURIComponent(invitationDestination(next))}`}
-              >
-                Confirm your email
-                <AnimatedIcon name="arrow-up-right" data-icon="inline-end" />
-              </Link>
-            </Button>
-          </div>
+          <Text muted small>
+            Already use email and password? Sign in or reset your password, then
+            connect Google in Settings.
+          </Text>
         )}
         <Submit pending={pending}>
           {mode === "sign-in" ? "Sign in" : "Create your account"}
@@ -465,69 +440,6 @@ export function VerifyForm({ next = "/dashboard" }: { next?: string }) {
             <Feedback state={verified} />
             <Submit pending={verifying}>Verify and continue</Submit>
           </FieldGroup>
-        </form>
-      )}
-    </div>
-  );
-}
-export function VerifyEmailLookupForm({
-  next = "/dashboard",
-}: {
-  next?: string;
-}) {
-  const [sent, send, sending] = useActionState(sendVerificationForEmail, {});
-  const [verified, verify, verifying] = useActionState(verifyEmailForEmail, {});
-  const [email, setEmail] = useState("");
-  const [codeRequested, setCodeRequested] = useState(false);
-
-  return (
-    <div className="flex flex-col gap-6">
-      <form
-        action={send}
-        onSubmit={() => setCodeRequested(true)}
-        className="flex flex-col gap-4"
-      >
-        <Field>
-          <FieldLabel htmlFor="verification-email">Email address</FieldLabel>
-          <Input
-            id="verification-email"
-            name="email"
-            type="email"
-            placeholder="you@example.com"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </Field>
-        <input type="hidden" name="next" value={invitationDestination(next)} />
-        <Feedback state={sent} />
-        <Submit pending={sending}>Email me a confirmation code</Submit>
-      </form>
-      {codeRequested && (
-        <form action={verify} className="flex flex-col gap-4">
-          <input type="hidden" name="email" value={email} />
-          <input
-            type="hidden"
-            name="next"
-            value={invitationDestination(next)}
-          />
-          <Field>
-            <FieldLabel htmlFor="verification-otp">Six-digit code</FieldLabel>
-            <Input
-              id="verification-otp"
-              name="otp"
-              inputMode="numeric"
-              className="text-center text-xl tracking-[0.35em]"
-              placeholder="000000"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              required
-            />
-          </Field>
-          <Feedback state={verified} />
-          <Submit pending={verifying}>Confirm email</Submit>
         </form>
       )}
     </div>

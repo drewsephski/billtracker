@@ -4,14 +4,44 @@ import {
 } from "@neondatabase/auth/server";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "@/lib/server/auth";
+import { invitationDestination } from "@/lib/domain/navigation";
 
 export async function proxy(request: NextRequest) {
   // Neon middleware must process the OAuth verifier on the first navigation
   // back from Google. It exchanges that verifier for the session cookie before
   // the protected route renders. Calling get-session directly here skips that
   // exchange and sends a successful OAuth login back to /sign-in.
-  if (request.nextUrl.searchParams.has("neon_auth_session_verifier"))
-    return getAuth().middleware({ loginUrl: "/sign-in" })(request);
+  if (request.nextUrl.searchParams.has("neon_auth_session_verifier")) {
+    let response: Response | undefined;
+    try {
+      response = await getAuth().middleware({ loginUrl: "/sign-in" })(request);
+      const location = response.headers.get("location");
+      const destination = location ? new URL(location, request.url) : null;
+      if (
+        destination?.origin === request.nextUrl.origin &&
+        destination.pathname === request.nextUrl.pathname &&
+        !destination.searchParams.has("neon_auth_session_verifier")
+      )
+        return response;
+    } catch {
+      // Neither provider exceptions nor verifier tokens belong in recovery URLs.
+    }
+    const target = new URL(
+      request.nextUrl.pathname === "/settings" ? "/settings" : "/sign-in",
+      request.url,
+    );
+    target.searchParams.set("error", "invalid_callback");
+    if (target.pathname === "/sign-in")
+      target.searchParams.set(
+        "next",
+        invitationDestination(request.nextUrl.pathname),
+      );
+    const recovery = NextResponse.redirect(target);
+    for (const cookie of response?.headers.getSetCookie() || [])
+      recovery.headers.append("Set-Cookie", cookie);
+    recovery.headers.set("Cache-Control", "private, no-store");
+    return recovery;
+  }
 
   if (!request.cookies.has(NEON_AUTH_SESSION_COOKIE_NAME))
     return NextResponse.next();

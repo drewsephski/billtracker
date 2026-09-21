@@ -1,5 +1,10 @@
 "use server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import {
+  allowAuthRequest,
+  authClientKey,
+  resetRequestMessage,
+} from "./auth-throttle";
 import {
   ACTIVE_HOUSEHOLD_COOKIE,
   invitationDestination,
@@ -44,13 +49,24 @@ export async function authenticate(
     const values = authSchema.parse(Object.fromEntries(form));
     if (mode === "sign-up" && !values.name?.trim())
       return { error: "What should your roommates call you?" };
+    if (
+      !allowAuthRequest(
+        values.email,
+        authClientKey(await headers()),
+        mode === "sign-up" ? "send" : "attempt",
+      )
+    )
+      return { error: "Please wait a few minutes and try again." };
     result =
       mode === "sign-up"
         ? await getAuth().signUp.email({ ...values, name: values.name! })
         : await getAuth().signIn.email({ ...values, rememberMe: true });
     if (result.error)
       return {
-        error: result.error.message || "Check your email and password.",
+        error:
+          mode === "sign-in"
+            ? "We couldn’t sign you in. Check your email and password, or reset your password."
+            : "We couldn’t create the account. Try again, or sign in or reset your password if you already have an account.",
       };
   } catch (e) {
     return failure(e);
@@ -189,45 +205,23 @@ export async function sendVerification(
   void _state;
   const user = await requireUser(invitationDestination(form.get("next")));
   try {
+    if (!allowAuthRequest(user.email, authClientKey(await headers()), "send"))
+      return {
+        error: "Please wait a few minutes before requesting another code.",
+      };
     const result = await getAuth().emailOtp.sendVerificationOtp({
       email: user.email,
       type: "email-verification",
     });
     return result.error
-      ? { error: result.error.message }
+      ? {
+          error:
+            "We couldn’t send a verification code. Please try again shortly.",
+        }
       : { success: "A verification code is on its way. Check your email." };
   } catch (e) {
     return failure(e);
   }
-}
-export async function sendVerificationForEmail(
-  _state: ActionResult,
-  form: FormData,
-): Promise<ActionResult> {
-  void _state;
-  try {
-    const email = z.email().parse(form.get("email")).toLowerCase();
-    const result = await getAuth().emailOtp.sendVerificationOtp({
-      email,
-      type: "email-verification",
-    });
-    if (result.error) {
-      console.warn("Verification email request was not completed", {
-        error: result.error.message,
-      });
-    }
-  } catch (e) {
-    if (e instanceof z.ZodError)
-      return { error: e.issues[0]?.message || "Enter a valid email address." };
-    console.error(
-      "Public verification email request failed",
-      e instanceof Error ? e.name : "Unknown error",
-    );
-  }
-  return {
-    success:
-      "If that email has an unconfirmed account, a six-digit code is on its way.",
-  };
 }
 export async function verifyEmail(
   _state: ActionResult,
@@ -235,6 +229,12 @@ export async function verifyEmail(
 ): Promise<ActionResult> {
   const user = await requireUser(invitationDestination(form.get("next")));
   try {
+    if (
+      !allowAuthRequest(user.email, authClientKey(await headers()), "attempt")
+    )
+      return {
+        error: "Too many attempts. Please wait a few minutes and try again.",
+      };
     const otp = z
       .string()
       .regex(/^\d{6}$/, "Enter the six-digit code.")
@@ -243,71 +243,36 @@ export async function verifyEmail(
       email: user.email,
       otp,
     });
-    if (result.error) return { error: result.error.message };
+    if (result.error)
+      return {
+        error: "That code didn’t work. Request a new code and try again.",
+      };
   } catch (e) {
     return failure(e);
   }
   revalidatePath("/", "layout");
   redirect(invitationDestination(form.get("next")));
 }
-export async function verifyEmailForEmail(
-  _state: ActionResult,
-  form: FormData,
-): Promise<ActionResult> {
-  void _state;
-  const safeNext = invitationDestination(form.get("next"));
-  try {
-    const values = z
-      .object({
-        email: z.email(),
-        otp: z.string().regex(/^\d{6}$/, "Enter the six-digit code."),
-      })
-      .parse({
-        email: form.get("email"),
-        otp: form.get("otp"),
-      });
-    const result = await getAuth().emailOtp.verifyEmail({
-      email: values.email.toLowerCase(),
-      otp: values.otp,
-    });
-    if (result.error)
-      return {
-        error: "That code didn’t work. Request a new code and try again.",
-      };
-  } catch (e) {
-    if (e instanceof z.ZodError)
-      return { error: e.issues[0]?.message || "Check your entries." };
-    console.error(
-      "Public email verification failed",
-      e instanceof Error ? e.name : "Unknown error",
-    );
-    return {
-      error: "That code didn’t work. Request a new code and try again.",
-    };
-  }
-  revalidatePath("/", "layout");
-  redirect(`/sign-in?verified=1&next=${encodeURIComponent(safeNext)}`);
-}
 export async function requestPasswordReset(
   _state: ActionResult,
   form: FormData,
 ): Promise<ActionResult> {
   try {
-    const email = z.email().parse(form.get("email"));
-    const result = await getAuth().requestPasswordReset({
-      email,
-      redirectTo: `${appUrl()}/reset-password?next=${encodeURIComponent(invitationDestination(form.get("next")))}`,
-    });
-    if (result.error)
-      return {
-        error: "We couldn’t request a reset email. Please try again shortly.",
-      };
-    return {
-      success: "If that email has an account, a reset link is on its way.",
-    };
+    const email = z
+      .email()
+      .parse(String(form.get("email") || "").trim())
+      .toLowerCase();
+    if (allowAuthRequest(email, authClientKey(await headers()), "send"))
+      await getAuth().requestPasswordReset({
+        email,
+        redirectTo: `${appUrl()}/reset-password?next=${encodeURIComponent(invitationDestination(form.get("next")))}`,
+      });
   } catch (e) {
-    return failure(e);
+    if (e instanceof z.ZodError)
+      return { error: "Enter a valid email address." };
+    // Keep account existence, provider failures, and throttling indistinguishable.
   }
+  return { success: resetRequestMessage };
 }
 export async function resetPassword(
   _state: ActionResult,
@@ -320,11 +285,21 @@ export async function resetPassword(
         password: z.string().min(8).max(128),
       })
       .parse(Object.fromEntries(form));
+    if (
+      !allowAuthRequest(value.token, authClientKey(await headers()), "attempt")
+    )
+      return {
+        error: "Too many attempts. Please wait a few minutes and try again.",
+      };
     const result = await getAuth().resetPassword({
       token: value.token,
       newPassword: value.password,
     });
-    if (result.error) return { error: result.error.message };
+    if (result.error)
+      return {
+        error:
+          "That reset link is invalid or expired. Request a new link and try again.",
+      };
     return { success: "Password updated. You can now sign in." };
   } catch (e) {
     return failure(e);

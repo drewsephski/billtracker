@@ -1,10 +1,20 @@
 import { AuthEntry } from "@/components/auth-entry";
+import {
+  oauthErrorMessage,
+  type AuthSearchParams,
+} from "@/lib/domain/auth-errors";
 export const metadata = { title: "Create an account" };
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<AuthSearchParams>;
 }) {
-  const { next } = await searchParams;
-  return <AuthEntry mode="sign-up" next={next} />;
+  const params = await searchParams;
+  return (
+    <AuthEntry
+      mode="sign-up"
+      next={typeof params.next === "string" ? params.next : undefined}
+      oauthError={oauthErrorMessage(params.error)}
+    />
+  );
 }

@@ -14,13 +14,18 @@ import { HouseholdForm } from "./account-forms";
 import { ThemePreferenceControl } from "./theme-toggle";
 import { Blob } from "./blob";
 import { signOut } from "@/lib/server/actions";
+import { ConnectedAccounts } from "./connected-accounts";
 import type { HouseholdData } from "@/lib/domain/types";
 export function SettingsView({
   data,
   demo = false,
+  googleConnected = null,
+  oauthError,
 }: {
   data: HouseholdData;
   demo?: boolean;
+  googleConnected?: boolean | null;
+  oauthError?: string;
 }) {
   return (
     <>
@@ -50,6 +55,12 @@ export function SettingsView({
           </CardContent>
         </Card>
         <div className="flex flex-col gap-6">
+          {!demo && (
+            <ConnectedAccounts
+              googleConnected={googleConnected}
+              error={oauthError}
+            />
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Your account</CardTitle>

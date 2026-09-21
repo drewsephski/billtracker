@@ -1,4 +1,4 @@
-# Homeshare implementation plan
+# Homeshare implementation
 
 1. Foundation: pnpm, strict TypeScript, current shadcn primitives and warm neutral/green design tokens.
 2. Domain: exact cents, household-local calendar dates, deterministic splits, status, monthly rules.
@@ -6,9 +6,9 @@
 4. Vertical flows: managed Neon Auth → create/join → bills/splits → payments → recurring templates → household/settings.
 5. Verification: unit and database integration tests, browser smoke, format/lint/typecheck/build.
 
-## Model and security decisions (before implementation)
+## Current model and security decisions
 
-- Neon owns auth users/sessions; application profiles are keyed by verified auth user IDs (no passwords in app DB).
+- Neon owns auth users/sessions; application profiles are keyed by authenticated user IDs; verified email is required to accept invitations (no passwords in app DB).
 - Households have an IANA time zone and USD currency. Members have owner/member roles. Accounts can belong to multiple households; an HTTP-only preference selects one active household, validated against membership on each request. Migration `0003_pretty_wraith.sql` replaces account-wide membership uniqueness with `(household_id, user_id)` uniqueness and adds a user lookup index without rewriting financial records.
 - Invitations are email-bound, expire after seven days, store SHA-256 token hashes, and are consumed atomically. Link sharing is deliberate; no email delivery dependency.
 - Household members may create bills and record/undo their own payments. Owners may record/undo any member's payment, edit unpaid bills, and manage household invitations/templates. Bill creators may edit their own unpaid bills.
@@ -39,3 +39,12 @@ Provider-payment and roommate-settlement semantics are unchanged; see [the decis
 - Vitest: https://vitest.dev/guide/ ; Playwright: https://playwright.dev/docs/test-webserver
 
 Installed package types are checked alongside official documentation; stable package APIs take precedence over unreleased examples.
+
+## Current release boundaries
+
+- Migration 0003 supports multiple households; 0004 supports partial contributions, command idempotency and immutable financial history; 0005 adds shared chat messages/private jobs; 0006 adds chat recovery/query indexes and unique active proposals.
+- Activity drafts are private and temporary. Shared household chat persists conversation and selectively engages AI with bounded snapshots. Financial writes still require deterministic tenant checks and explicit author confirmation. See [ACTIVITY-CHAT.md](ACTIVITY-CHAT.md) and [HOUSE-CHAT.md](HOUSE-CHAT.md).
+- Google sign-in/signup remains available. Password users sign in/reset first, then connect Google through authenticated Settings. Neon SDK 0.5.0-beta owns OAuth; no custom merge or provider-table edits. Errors use fixed recovery copy.
+- [RELEASE.md](RELEASE.md) defines read-only release verification, endpoint-bound development safeguards, email throttling limits and manual production checks. No migration or production environment change is part of release hardening.
+
+The database branch currently holding real Homeshare users is the production source of truth. Do not move live data merely to make the branch name `main`. Create separate child branches for future development.
