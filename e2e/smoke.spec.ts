@@ -143,7 +143,14 @@ test("real Neon signup → household → invitation → bill → individual paym
   await page.getByRole("button", { name: "Add a bill" }).click();
   await page.getByLabel("Bill name").fill(`Shared internet ${suffix}`);
   await page.getByLabel("Total amount ($)").fill("99.99");
-  await page.getByLabel("Due date", { exact: true }).fill("2099-01-31");
+  await page.getByLabel("Due date", { exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Choose the Year" })
+    .selectOption("2099");
+  await page
+    .getByRole("combobox", { name: "Choose the Month" })
+    .selectOption("0");
+  await page.getByRole("button", { name: /January 31st, 2099/ }).click();
   await page.getByRole("switch", { name: "Repeat every month" }).check();
   await page.getByRole("button", { name: "Add bill", exact: true }).click();
   await expect(

@@ -1,3 +1,5 @@
+import { Blob } from "@/components/blob";
+import { Reveal } from "@/components/ui/motion";
 import { Skeleton } from "@/components/ui/skeleton";
 export default function Loading() {
   return (
@@ -6,6 +8,12 @@ export default function Loading() {
       role="status"
       aria-label="Loading household"
     >
+      <Reveal className="flex items-center gap-3">
+        <Blob className="size-16" />
+        <p className="text-sm text-muted-foreground">
+          Getting your home ready…
+        </p>
+      </Reveal>
       <Skeleton className="h-10 w-2/3" />
       <Skeleton className="h-5 w-1/2" />
       <div className="grid gap-5 md:grid-cols-2">

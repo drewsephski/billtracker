@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { House, Check } from "lucide-react";
+import { Check } from "lucide-react";
+import { Blob } from "./blob";
+import { Reveal } from "./ui/motion";
 import { Brand } from "./brand";
 import {
   Card,
@@ -27,11 +29,11 @@ export function PublicShell({
           <Link href="/demo">Take a peek</Link>
         </Button>
       </header>
-      <main className="mx-auto grid max-w-5xl items-center gap-12 px-5 py-10 md:grid-cols-2 md:py-20">
+      <main className="mx-auto grid max-w-5xl items-center gap-10 px-5 py-5 md:grid-cols-2 md:py-20">
         <div className="hidden flex-col gap-7 md:flex">
-          <House className="size-12 text-primary" strokeWidth={1.4} />
+          <Blob priority className="size-48" />
           <Eyebrow>Shared home. Clear bills.</Eyebrow>
-          <Heading className="text-5xl leading-tight">
+          <Heading level={2} className="text-5xl leading-tight">
             Less “who owes what?”
             <br />
             More feeling at home.
@@ -54,15 +56,21 @@ export function PublicShell({
             ))}
           </div>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <Heading level={2}>{title}</Heading>
-            </CardTitle>
-            <CardDescription>{description}</CardDescription>
-          </CardHeader>
-          <CardContent>{children}</CardContent>
-        </Card>
+        <Reveal>
+          <Card className="relative">
+            <div className="flex items-center gap-3 px-5 md:hidden">
+              <Blob className="size-20" />
+              <Eyebrow>Make yourself at home</Eyebrow>
+            </div>
+            <CardHeader>
+              <CardTitle>
+                <Heading className="text-2xl sm:text-3xl">{title}</Heading>
+              </CardTitle>
+              <CardDescription>{description}</CardDescription>
+            </CardHeader>
+            <CardContent>{children}</CardContent>
+          </Card>
+        </Reveal>
       </main>
     </div>
   );

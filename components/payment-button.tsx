@@ -1,8 +1,9 @@
 "use client";
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import { useState, useTransition } from "react";
-import { Check, Undo2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Feedback } from "./feedback";
+import { DemoNotice, Feedback } from "./feedback";
 import { paymentAction } from "@/lib/server/actions";
 import type { ActionResult } from "@/lib/domain/types";
 export function PaymentButton({
@@ -12,6 +13,7 @@ export function PaymentButton({
   paymentId,
   name,
   demo,
+  className,
 }: {
   householdId: string;
   billId: string;
@@ -19,12 +21,14 @@ export function PaymentButton({
   paymentId: string | null;
   name: string;
   demo?: boolean;
+  className?: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [state, setState] = useState<ActionResult>({});
   return (
-    <div className="flex flex-col items-start gap-2">
+    <>
       <Button
+        className={className}
         size="sm"
         variant={paymentId ? "ghost" : "outline"}
         disabled={pending}
@@ -56,13 +60,17 @@ export function PaymentButton({
         {pending ? (
           <Loader2 className="animate-spin" data-icon="inline-start" />
         ) : paymentId ? (
-          <Undo2 data-icon="inline-start" />
+          <AnimatedIcon name="undo" data-icon="inline-start" />
         ) : (
-          <Check data-icon="inline-start" />
+          <AnimatedIcon name="check" data-icon="inline-start" />
         )}
         {paymentId ? "Undo" : "Mark paid"}
       </Button>
-      <Feedback state={state} />
-    </div>
+      {(state.error || state.success) && (
+        <div className="col-span-full min-w-0">
+          {demo ? <DemoNotice /> : <Feedback state={state} />}
+        </div>
+      )}
+    </>
   );
 }

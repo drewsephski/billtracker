@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "project": {
+    "name": "homeshare",
+    "productType": "Roommate household bill tracker",
+    "stack": ["nextjs", "react", "shadcn", "tailwind-v4"]
+  },
+  "sources": {
+    "tokens": ["app/globals.css"],
+    "components": ["components/ui"],
+    "assets": ["public/images/homeshare-blob.png"],
+    "instructions": ["AGENTS.md", "CLAUDE.md"]
+  },
+  "design": {
+    "colorMode": "light-and-dark",
+    "colors": {
+      "--background": {
+        "value": "#f7f7fa",
+        "source": "app/globals.css"
+      },
+      "--foreground": {
+        "value": "#262938",
+        "source": "app/globals.css"
+      },
+      "--primary": {
+        "value": "#4d5dca",
+        "source": "app/globals.css"
+      },
+      "--secondary": {
+        "value": "#eceeff",
+        "source": "app/globals.css"
+      },
+      "--balance-background": {
+        "value": "#e9edff",
+        "source": "app/globals.css"
+      }
+    },
+    "typography": {
+      "--font-sans": {
+        "value": "var(--font-geist-sans)",
+        "source": "app/globals.css"
+      },
+      "--font-mono": {
+        "value": "var(--font-geist-mono)",
+        "source": "app/globals.css"
+      },
+      "--font-heading": {
+        "value": "var(--font-sans)",
+        "source": "app/globals.css"
+      }
+    },
+    "spacing": {
+      "--card-spacing": {
+        "value": "1.5rem",
+        "source": "app/globals.css"
+      }
+    },
+    "radius": {
+      "--radius-sm": {
+        "value": "calc(var(--radius) * 0.6)",
+        "source": "app/globals.css"
+      },
+      "--radius-md": {
+        "value": "calc(var(--radius) * 0.8)",
+        "source": "app/globals.css"
+      },
+      "--radius-lg": {
+        "value": "var(--radius)",
+        "source": "app/globals.css"
+      },
+      "--radius-xl": {
+        "value": "calc(var(--radius) * 1.4)",
+        "source": "app/globals.css"
+      },
+      "--radius-2xl": {
+        "value": "calc(var(--radius) * 1.8)",
+        "source": "app/globals.css"
+      },
+      "--radius-3xl": {
+        "value": "calc(var(--radius) * 2.2)",
+        "source": "app/globals.css"
+      },
+      "--radius-4xl": {
+        "value": "calc(var(--radius) * 2.6)",
+        "source": "app/globals.css"
+      },
+      "--radius": {
+        "value": "1rem",
+        "source": "app/globals.css"
+      }
+    },
+    "shadows": {},
+    "motion": {
+      "duration": "180\u2013300ms",
+      "reducedMotion": "Respect user preference",
+      "library": "framer-motion"
+    },
+    "density": "spacious-mobile-first"
+  },
+  "components": {
+    "installed": [
+      "alert",
+      "avatar",
+      "badge",
+      "button",
+      "card",
+      "checkbox",
+      "dialog",
+      "empty",
+      "field",
+      "input",
+      "label",
+      "progress",
+      "select",
+      "separator",
+      "skeleton",
+      "switch",
+      "tabs",
+      "textarea",
+      "typography",
+      "calendar",
+      "popover",
+      "date-picker",
+      "disclosure"
+    ],
+    "preferredPrimitives": ["Existing shadcn/Radix components"],
+    "patterns": [
+      "Mobile bottom sheets",
+      "Animated segmented controls",
+      "Personal balance and attention list",
+      "Blob empty and feedback states"
+    ]
+  },
+  "constraints": {
+    "must": [
+      "Preserve authorization and domain services",
+      "iPhone-first layout",
+      "Lucide icons",
+      "Keyboard and reduced-motion support"
+    ],
+    "avoid": [
+      "Analytics dashboard density",
+      "New financial features",
+      "Looping decorative motion"
+    ]
+  },
+  "decisions": [
+    "Use a restrained periwinkle and soft-gray palette with a matte blob mascot.",
+    "Lead with personal remaining shares and keep household progress secondary.",
+    "Adapt existing Radix controls using public 21st references; catalog access was unauthorized.",
+    "Use the official shadcn Calendar and Popover for bill dates, with a compact trigger, calendar-only date conversion, and the existing 2000-2100 limits."
+  ],
+  "evidence": [
+    {
+      "fact": "components.installed",
+      "source": "components/ui"
+    },
+    {
+      "fact": "design.colorMode:light-and-dark",
+      "source": "app/globals.css"
+    },
+    {
+      "fact": "design.tokens",
+      "source": "app/globals.css"
+    },
+    {
+      "fact": "project.instructions",
+      "source": "AGENTS.md"
+    },
+    {
+      "fact": "project.instructions",
+      "source": "CLAUDE.md"
+    },
+    {
+      "fact": "project.stack:nextjs",
+      "source": "package.json"
+    },
+    {
+      "fact": "project.stack:react",
+      "source": "package.json"
+    },
+    {
+      "fact": "project.stack:shadcn",
+      "source": "components.json"
+    },
+    {
+      "fact": "project.stack:tailwind-v4",
+      "source": "package.json"
+    }
+  ],
+  "generatedAt": "2026-09-21T01:11:00.310Z"
+}

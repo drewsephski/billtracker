@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Blob } from "./blob";
 import { Users, ShieldCheck } from "lucide-react";
 import {
   Card,
@@ -68,8 +69,9 @@ export function HouseholdView({
             ))}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-secondary/40">
           <CardHeader>
+            <Blob className="mb-2 size-28" />
             <CardTitle>Room for one more?</CardTitle>
             <CardDescription>
               Invite a roommate so they can see and settle their share.

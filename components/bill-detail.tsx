@@ -1,6 +1,8 @@
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import Link from "next/link";
-import { ArrowLeft, LockKeyhole, Repeat2, CheckCircle2 } from "lucide-react";
+import { LockKeyhole, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import {
   Card,
   CardHeader,
@@ -45,7 +47,7 @@ export function BillDetail({
       <div>
         <Button asChild variant="ghost">
           <Link href={`${demo ? "/demo" : ""}/bills`}>
-            <ArrowLeft data-icon="inline-start" />
+            <AnimatedIcon name="arrow-left" data-icon="inline-start" />
             All bills
           </Link>
         </Button>
@@ -71,61 +73,7 @@ export function BillDetail({
         )}
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Everyone’s share</CardTitle>
-            <CardDescription>
-              Mark a share as paid once the money has been settled.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-5">
-            {bill.splits.map((share, i) => (
-              <div key={share.id}>
-                {i > 0 && <Separator className="mb-5" />}
-                <div className="flex flex-wrap items-center gap-3">
-                  <Avatar size="lg">
-                    <AvatarFallback>{share.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <Text className="font-medium">
-                      {share.name}
-                      {share.memberId === data.viewer.id ? " (you)" : ""}
-                    </Text>
-                    <Text small muted>
-                      {share.paidCents >= share.amountCents
-                        ? "All settled"
-                        : "Still to pay"}
-                    </Text>
-                  </div>
-                  <Text className="text-xl font-semibold tabular-nums">
-                    {money(share.amountCents)}
-                  </Text>
-                  {share.amountCents === 0 ? (
-                    <Badge variant="success">No share due</Badge>
-                  ) : canManageShare(
-                      data.viewer.role,
-                      data.viewer.id,
-                      share.memberId,
-                    ) ? (
-                    <PaymentButton
-                      householdId={data.household.id}
-                      billId={bill.id}
-                      splitId={share.id}
-                      paymentId={share.paymentId}
-                      name={share.name}
-                      demo={demo}
-                    />
-                  ) : (
-                    <Badge variant={share.paymentId ? "success" : "outline"}>
-                      {share.paymentId ? "Paid" : "Unpaid"}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        <div className="flex flex-col gap-6">
+        <div className="order-1 flex flex-col gap-6 lg:order-2">
           <Card>
             <CardHeader>
               <CardDescription>Total bill</CardDescription>
@@ -149,7 +97,7 @@ export function BillDetail({
               </div>
               {bill.templateId && (
                 <Text muted small className="flex items-center gap-2">
-                  <Repeat2 className="size-4" />
+                  <AnimatedIcon name="refresh-cw" className="size-4" />
                   Part of a monthly bill
                 </Text>
               )}
@@ -161,18 +109,90 @@ export function BillDetail({
               )}
             </CardContent>
           </Card>
-          {bill.hasPaymentHistory && (
-            <Alert>
-              <LockKeyhole />
-              <AlertDescription>
-                This bill has payment history, so its amount and shares are
-                locked. Recurring settings can still be changed for future
-                bills.
-              </AlertDescription>
-            </Alert>
-          )}
         </div>
+        <Card className="order-2 lg:order-1">
+          <CardHeader>
+            <CardTitle>Everyone’s share</CardTitle>
+            <CardDescription>
+              Mark a share as paid once the money has been settled.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="@container flex flex-col gap-5">
+            {bill.splits.map((share, i) => (
+              <div key={share.id}>
+                {i > 0 && <Separator className="mb-5" />}
+                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 @min-[440px]:grid-cols-[auto_minmax(0,1fr)_auto_7rem] @min-[440px]:gap-x-5">
+                  <Avatar size="lg">
+                    <AvatarFallback>{share.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <Text className="break-words font-medium">
+                      {share.name}
+                      {share.memberId === data.viewer.id ? " (you)" : ""}
+                    </Text>
+                    <Text small muted>
+                      {share.paidCents >= share.amountCents
+                        ? "All settled"
+                        : "Still to pay"}
+                    </Text>
+                  </div>
+                  <Text className="text-right text-lg font-semibold tabular-nums">
+                    {money(share.amountCents)}
+                  </Text>
+                  {share.amountCents === 0 ? (
+                    <Badge
+                      variant="success"
+                      className="col-span-2 col-start-2 justify-self-end @min-[440px]:col-span-1 @min-[440px]:col-start-auto"
+                    >
+                      No share due
+                    </Badge>
+                  ) : canManageShare(
+                      data.viewer.role,
+                      data.viewer.id,
+                      share.memberId,
+                    ) ? (
+                    <PaymentButton
+                      className="col-span-2 col-start-2 justify-self-end @min-[440px]:col-span-1 @min-[440px]:col-start-auto @min-[440px]:w-28"
+                      householdId={data.household.id}
+                      billId={bill.id}
+                      splitId={share.id}
+                      paymentId={share.paymentId}
+                      name={share.name}
+                      demo={demo}
+                    />
+                  ) : (
+                    <Badge
+                      variant={share.paymentId ? "success" : "outline"}
+                      className="col-span-2 col-start-2 justify-self-end @min-[440px]:col-span-1 @min-[440px]:col-start-auto"
+                    >
+                      {share.paymentId ? "Paid" : "Unpaid"}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
+      <Disclosure
+        title="About recording payments"
+        className="rounded-2xl px-5"
+        triggerClassName="font-normal text-muted-foreground"
+      >
+        <Text small muted>
+          Settle up however you usually do, then record the payment here. No
+          money is transferred by homeshare.
+        </Text>
+        {bill.hasPaymentHistory && (
+          <Alert>
+            <LockKeyhole />
+            <AlertDescription>
+              This bill has payment history, so its amount and shares are
+              locked. Recurring settings can still be changed for future bills.
+            </AlertDescription>
+          </Alert>
+        )}
+      </Disclosure>
       <Card>
         <CardHeader>
           <CardTitle>Payment history</CardTitle>

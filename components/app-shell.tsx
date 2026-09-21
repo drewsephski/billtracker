@@ -1,15 +1,10 @@
 "use client";
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
+import { Reveal } from "./ui/motion";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  ReceiptText,
-  Users,
-  Settings,
-  House,
-  ArrowUpRight,
-  LogOut,
-} from "lucide-react";
+import { Users, House, LogOut } from "lucide-react";
 import { Brand } from "./brand";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -27,11 +22,11 @@ import { Text } from "@/components/ui/typography";
 import { signOut } from "@/lib/server/actions";
 import type { HouseholdData } from "@/lib/domain/types";
 const links = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/bills", label: "Bills", icon: ReceiptText },
-  { href: "/household", label: "Household", icon: Users },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
+  { href: "/dashboard", label: "Home", icon: "home" },
+  { href: "/bills", label: "Bills", icon: "receipt-text" },
+  { href: "/household", label: "Household", icon: "users" },
+  { href: "/settings", label: "Settings", icon: "settings" },
+] as const;
 export function AppShell({
   data,
   demo = false,
@@ -42,22 +37,24 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const path = usePathname();
+  const reduced = useReducedMotion();
   const prefix = demo ? "/demo" : "";
-  const nav = links.map(({ href, label, icon: Icon }) => (
+  const active = (href: string) =>
+    path === `${prefix}${href}` ||
+    (href === "/bills" && path.startsWith(`${prefix}/bills/`)) ||
+    (demo && path === "/demo" && href === "/dashboard");
+  const nav = links.map(({ href, label, icon }) => (
     <Button
       key={href}
-      variant={
-        path === `${prefix}${href}` ||
-        (href === "/bills" && path.startsWith(`${prefix}/bills/`)) ||
-        (demo && path === "/demo" && href === "/dashboard")
-          ? "secondary"
-          : "ghost"
-      }
+      variant={active(href) ? "secondary" : "ghost"}
       asChild
-      className="justify-start"
+      className="h-12 justify-start gap-3 px-4"
     >
-      <Link href={`${prefix}${href}`}>
-        <Icon data-icon="inline-start" />
+      <Link
+        href={`${prefix}${href}`}
+        aria-current={active(href) ? "page" : undefined}
+      >
+        <AnimatedIcon name={icon} data-icon="inline-start" />
         <span>{label}</span>
       </Link>
     </Button>
@@ -70,7 +67,7 @@ export function AppShell({
       >
         Skip to content
       </a>
-      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r bg-card p-5 lg:flex">
+      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-border/60 bg-card p-5 lg:flex">
         <Brand />
         <Separator className="my-7" />
         <Card size="sm">
@@ -119,7 +116,7 @@ export function AppShell({
         </div>
       </aside>
       <div className="lg:pl-60">
-        <header className="flex min-h-20 items-center justify-between gap-3 border-b bg-background/95 px-5 sm:px-9">
+        <header className="flex min-h-18 items-center justify-between gap-3 border-b border-border/60 bg-background/95 px-5 sm:px-9">
           <div className="lg:hidden">
             <Brand />
           </div>
@@ -137,7 +134,10 @@ export function AppShell({
                   <Link href="/sign-up">
                     <span className="sm:hidden">Join</span>
                     <span className="hidden sm:inline">Make it yours</span>
-                    <ArrowUpRight data-icon="inline-end" />
+                    <AnimatedIcon
+                      name="arrow-up-right"
+                      data-icon="inline-end"
+                    />
                   </Link>
                 </Button>
               </>
@@ -150,30 +150,54 @@ export function AppShell({
         </header>
         <main
           id="main-content"
-          className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-8 pb-28 sm:px-9 sm:py-10 lg:pb-10"
+          className="mx-auto flex w-full max-w-6xl px-5 pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-9 sm:pt-10 lg:pb-10"
         >
-          {children}
+          <Reveal
+            key={path}
+            className="flex w-full min-w-0 flex-col gap-7 sm:gap-8"
+          >
+            {children}
+          </Reveal>
         </main>
       </div>
       <nav
         aria-label="Mobile navigation"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 gap-1 border-t bg-card px-2 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 gap-1 border-t border-border/70 bg-card/95 px-3 pt-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden"
       >
-        {links.map(({ href, label, icon: Icon }) => (
+        {links.map(({ href, label, icon }) => (
           <Button
             key={href}
             asChild
-            variant={
-              path.startsWith(`${prefix}${href}`) ||
-              (demo && path === "/demo" && href === "/dashboard")
-                ? "secondary"
-                : "ghost"
-            }
-            className="h-auto flex-col gap-1 px-1 py-2"
+            variant="ghost"
+            className="relative isolate h-auto min-h-14 flex-col gap-1 rounded-2xl px-1 py-2"
           >
-            <Link href={`${prefix}${href}`}>
-              <Icon />
-              <span className="text-xs">{label}</span>
+            <Link
+              href={`${prefix}${href}`}
+              aria-current={active(href) ? "page" : undefined}
+            >
+              {active(href) && (
+                <motion.span
+                  aria-hidden
+                  layoutId={reduced ? undefined : "mobile-nav"}
+                  transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                  className="absolute inset-x-1 inset-y-0 -z-10 rounded-2xl bg-secondary"
+                />
+              )}
+              <AnimatedIcon
+                name={icon}
+                className={
+                  active(href) ? "text-primary" : "text-muted-foreground"
+                }
+              />
+              <span
+                className={
+                  active(href)
+                    ? "text-[11px] font-semibold text-primary"
+                    : "text-[11px] text-muted-foreground"
+                }
+              >
+                {label}
+              </span>
             </Link>
           </Button>
         ))}

@@ -1,12 +1,8 @@
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Check,
-  House,
-  HeartHandshake,
-  Repeat2,
-  Users,
-} from "lucide-react";
+import { Check, House } from "lucide-react";
+import { Blob } from "@/components/blob";
+import { Reveal } from "@/components/ui/motion";
 import { Brand } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,16 +26,16 @@ export default function Home() {
           <Button variant="ghost" asChild>
             <Link href="/sign-in">Sign in</Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="hidden sm:inline-flex">
             <Link href="/sign-up">
               Get started
-              <ArrowRight data-icon="inline-end" />
+              <AnimatedIcon name="arrow-right" data-icon="inline-end" />
             </Link>
           </Button>
         </nav>
       </header>
       <main className="mx-auto max-w-6xl px-5 pb-20 sm:px-10">
-        <section className="grid items-center gap-12 py-12 md:grid-cols-[1.2fr_1fr] md:gap-20 md:py-24">
+        <section className="grid items-center gap-12 py-12 md:grid-cols-2 md:gap-10 md:py-16 lg:gap-16 lg:py-20">
           <div className="flex flex-col items-start gap-7">
             <Badge variant="secondary">
               <House data-icon="inline-start" />A little less bill stress
@@ -59,7 +55,7 @@ export default function Home() {
               <Button size="lg" asChild>
                 <Link href="/sign-up">
                   Bring your home together
-                  <ArrowRight data-icon="inline-end" />
+                  <AnimatedIcon name="arrow-right" data-icon="inline-end" />
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
@@ -71,23 +67,30 @@ export default function Home() {
               Simple to start. Made for real roommates.
             </Text>
           </div>
-          <div className="relative mx-auto w-full max-w-md">
-            <div className="mb-5 flex items-center justify-between">
-              <Eyebrow>Lake Street Apartment</Eyebrow>
-              <Badge variant="outline">3 roommates</Badge>
+          <Reveal className="relative isolate mx-auto w-full max-w-md">
+            <div
+              aria-hidden
+              className="absolute -inset-x-3 top-16 bottom-0 -z-10 rounded-[2rem] bg-secondary/60 sm:-inset-x-4"
+            />
+            <div className="flex h-32 items-end justify-end pr-5 sm:h-36 sm:pr-7">
+              <Blob priority className="-mb-2 size-40 sm:size-44" />
             </div>
             <BillCard bill={data.bills[1]} today={data.today} demo />
-            <Card size="sm" className="mx-4 mt-5 bg-secondary/60">
-              <CardContent className="flex items-center gap-3">
-                <HeartHandshake className="size-7 shrink-0 text-primary" />
-                <Text small>
-                  Clear shares. Fewer reminders.
-                  <br />
-                  <strong>A happier home.</strong>
-                </Text>
-              </CardContent>
-            </Card>
-          </div>
+            <div
+              data-animated-icon-trigger
+              className="mx-auto flex max-w-xs items-center justify-center gap-3 px-3 py-5"
+            >
+              <AnimatedIcon
+                name="heart-handshake"
+                className="size-7 shrink-0 text-primary"
+              />
+              <Text small>
+                Clear shares. Fewer reminders.
+                <br />
+                <strong>A happier home.</strong>
+              </Text>
+            </div>
+          </Reveal>
         </section>
         <section className="flex flex-col gap-8 py-8">
           <div className="flex flex-col gap-2">
@@ -99,27 +102,30 @@ export default function Home() {
           <div className="grid gap-5 md:grid-cols-3">
             {[
               {
-                icon: House,
+                icon: "home" as const,
                 title: "Your bills have a home.",
                 description:
                   "See what’s coming up, what’s overdue, and what’s already paid. No buried group-chat messages.",
               },
               {
-                icon: Users,
+                icon: "users" as const,
                 title: "A fair share for everyone.",
                 description:
                   "Split equally or set custom amounts. Everyone can see their part and mark it paid.",
               },
               {
-                icon: Repeat2,
+                icon: "refresh-cw" as const,
                 title: "Ready for next month.",
                 description:
                   "Set monthly bills once. New bills appear automatically, and your payment history stays intact.",
               },
-            ].map(({ icon: Icon, title, description }) => (
-              <Card key={title}>
+            ].map(({ icon, title, description }) => (
+              <Card key={title} data-animated-icon-trigger>
                 <CardHeader>
-                  <Icon className="mb-4 size-6 text-primary" />
+                  <AnimatedIcon
+                    name={icon}
+                    className="mb-4 size-6 text-primary"
+                  />
                   <CardTitle>{title}</CardTitle>
                 </CardHeader>
                 <CardContent>

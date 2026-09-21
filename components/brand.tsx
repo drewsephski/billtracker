@@ -1,12 +1,16 @@
 import Link from "next/link";
-import { House } from "lucide-react";
+import { Blob } from "./blob";
 import { Button } from "@/components/ui/button";
 export function Brand() {
   return (
-    <Button variant="ghost" asChild className="justify-start">
+    <Button
+      variant="ghost"
+      asChild
+      className="justify-start gap-1.5 px-0 hover:bg-transparent"
+    >
       <Link href="/" aria-label="Homeshare home">
-        <House data-icon="inline-start" />
-        <span className="text-xl font-semibold tracking-tight">
+        <Blob className="size-9" />
+        <span className="text-xl font-semibold tracking-[-0.055em]">
           homeshare<span className="text-primary">.</span>
         </span>
       </Link>

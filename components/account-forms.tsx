@@ -1,7 +1,8 @@
 "use client";
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
-import { ArrowRight, Copy, Check, Loader2 } from "lucide-react";
+import { Copy, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -129,7 +130,7 @@ export function AuthForm({
         <Feedback state={state} />
         <Submit pending={pending}>
           {mode === "sign-in" ? "Welcome back" : "Create your account"}
-          <ArrowRight data-icon="inline-end" />
+          <AnimatedIcon name="arrow-right" data-icon="inline-end" />
         </Submit>
         <Text muted small className="text-center">
           {mode === "sign-in" ? "New around here?" : "Already have an account?"}{" "}
@@ -208,7 +209,7 @@ export function HouseholdForm({
         {!readOnly && (
           <Submit pending={pending}>
             {household ? "Save household settings" : "Create your household"}
-            <ArrowRight data-icon="inline-end" />
+            <AnimatedIcon name="arrow-right" data-icon="inline-end" />
           </Submit>
         )}
       </FieldGroup>
@@ -220,7 +221,9 @@ export function InviteForm({ householdId }: { householdId: string }) {
     inviteAction.bind(null, householdId),
     {},
   );
-  const [copied, setCopied] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState<string>();
+  const [copyError, setCopyError] = useState<string>();
+  const copied = Boolean(state.url && copiedUrl === state.url);
   return (
     <form action={action}>
       <FieldGroup>
@@ -258,9 +261,13 @@ export function InviteForm({ householdId }: { householdId: string }) {
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(state.url!);
-                  setCopied(true);
+                  setCopiedUrl(state.url);
+                  setCopyError(undefined);
                 } catch {
-                  setCopied(false);
+                  setCopiedUrl(undefined);
+                  setCopyError(
+                    "Couldn’t copy the link. Select it above and copy it manually.",
+                  );
                 }
               }}
             >
@@ -271,6 +278,7 @@ export function InviteForm({ householdId }: { householdId: string }) {
               )}
               {copied ? "Copied" : "Copy invitation"}
             </Button>
+            {copyError && <Feedback state={{ error: copyError }} />}
             <FieldDescription>
               Expires in 7 days. Creating another invitation for this email
               revokes the previous one.
@@ -323,7 +331,7 @@ export function AcceptForm({ token }: { token: string }) {
         <Feedback state={state} />
         <Submit pending={pending}>
           Join household
-          <ArrowRight data-icon="inline-end" />
+          <AnimatedIcon name="arrow-right" data-icon="inline-end" />
         </Submit>
       </FieldGroup>
     </form>

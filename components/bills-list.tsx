@@ -1,25 +1,29 @@
 "use client";
 import { useState } from "react";
-import { Search, ReceiptText } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Empty,
-  EmptyHeader,
-  EmptyTitle,
-  EmptyDescription,
-  EmptyMedia,
-} from "@/components/ui/empty";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Reveal } from "./ui/motion";
+import { FriendlyState } from "./friendly-state";
 import { BillCard } from "./bill-card";
 import type { BillView } from "@/lib/domain/types";
+const filters = [
+  { value: "all", label: "All bills" },
+  { value: "mine", label: "Your shares" },
+  { value: "overdue", label: "Overdue" },
+  { value: "paid", label: "Paid" },
+];
 export function BillsList({
   bills,
   today,
+  viewerId,
   demo = false,
   initialFilter = "all",
 }: {
   bills: BillView[];
   today: string;
+  viewerId?: string;
   demo?: boolean;
   initialFilter?: string;
 }) {
@@ -27,68 +31,124 @@ export function BillsList({
   const [search, setSearch] = useState("");
   const filtered = bills
     .filter(
-      (b) =>
+      (bill) =>
         (filter === "all" ||
-          (filter === "unpaid"
-            ? b.status !== "paid"
-            : filter === "upcoming"
-              ? b.dueDate >= today && b.status !== "paid"
-              : b.status === filter)) &&
-        b.name.toLowerCase().includes(search.toLowerCase()),
+          (filter === "mine"
+            ? bill.splits.some(
+                (share) =>
+                  share.memberId === viewerId &&
+                  share.paidCents < share.amountCents,
+              )
+            : filter === "unpaid"
+              ? bill.status !== "paid"
+              : filter === "upcoming"
+                ? bill.dueDate >= today && bill.status !== "paid"
+                : bill.status === filter)) &&
+        bill.name.toLowerCase().includes(search.toLowerCase()),
     )
     .sort(
       (a, b) =>
         (a.status === "paid" ? 1 : 0) - (b.status === "paid" ? 1 : 0) ||
         a.dueDate.localeCompare(b.dueDate),
     );
+  const visibleFilters = ["unpaid", "upcoming"].includes(filter)
+    ? [
+        ...filters,
+        { value: filter, label: filter === "unpaid" ? "Unpaid" : "Upcoming" },
+      ]
+    : filters;
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col justify-between gap-4 xl:flex-row">
-        <Tabs value={filter} onValueChange={setFilter}>
-          <TabsList className="flex h-auto flex-wrap justify-start">
-            {["all", "upcoming", "unpaid", "overdue", "paid"].map((f) => (
-              <TabsTrigger key={f} value={f}>
-                {f[0].toUpperCase() + f.slice(1)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <div className="flex items-center gap-2">
-          <Search className="size-4 shrink-0 text-muted-foreground" />
-          <Input
-            aria-label="Search bills"
-            placeholder="Find a bill…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full xl:w-56"
-          />
-        </div>
+    <Tabs value={filter} onValueChange={setFilter} className="gap-5">
+      <div className="relative">
+        <Search
+          aria-hidden
+          className="absolute left-4 top-4 size-4 text-muted-foreground"
+        />
+        <Input
+          aria-label="Search bills"
+          placeholder="Find a bill…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="bg-card pr-12 pl-11"
+        />
+        {search && (
+          <Button
+            aria-label="Clear search"
+            size="icon"
+            variant="ghost"
+            onClick={() => setSearch("")}
+            className="absolute right-1 top-0.5"
+          >
+            <X />
+          </Button>
+        )}
       </div>
-      {filtered.length ? (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((b) => (
-            <BillCard key={b.id} bill={b} today={today} demo={demo} />
+      <div className="-mx-1 overflow-x-auto px-1 pb-1">
+        <TabsList aria-label="Filter bills" className="w-full">
+          {visibleFilters.map((item) => (
+            <TabsTrigger
+              key={item.value}
+              value={item.value}
+              className="px-2 text-xs sm:px-4 sm:text-sm"
+            >
+              {item.label}
+            </TabsTrigger>
           ))}
-        </div>
-      ) : (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ReceiptText />
-            </EmptyMedia>
-            <EmptyTitle>
-              {bills.length
-                ? "Nothing here. That’s a good thing."
-                : "Your shared bills start here."}
-            </EmptyTitle>
-            <EmptyDescription>
-              {bills.length
-                ? "No bills match this view. Try a different filter or search."
-                : "Add your first bill and we’ll help you keep track of everyone’s share."}
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      )}
-    </div>
+        </TabsList>
+      </div>
+      <div aria-live="polite" className="sr-only">
+        {filtered.length} {filtered.length === 1 ? "bill" : "bills"} found
+      </div>
+      <TabsContent value={filter}>
+        <Reveal key={filter}>
+          {filtered.length ? (
+            <div className="grid items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
+              {filtered.map((bill) => (
+                <BillCard
+                  key={bill.id}
+                  bill={bill}
+                  today={today}
+                  viewerId={viewerId}
+                  demo={demo}
+                />
+              ))}
+            </div>
+          ) : (
+            <FriendlyState
+              title={
+                search
+                  ? "No bills by that name."
+                  : !bills.length
+                    ? "Your shared bills start here."
+                    : filter === "overdue"
+                      ? "No overdue bills. Breathe easy."
+                      : filter === "mine"
+                        ? "Your shares are all settled."
+                        : "A little quiet here."
+              }
+              description={
+                search
+                  ? "Try another name, or clear your search to see your bills."
+                  : !bills.length
+                    ? "Add your first bill and give everyone’s share a home."
+                    : "You’re up to date with this view. See all bills for the full picture."
+              }
+            >
+              {(search || filter !== "all") && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearch("");
+                    setFilter("all");
+                  }}
+                >
+                  See all bills
+                </Button>
+              )}
+            </FriendlyState>
+          )}
+        </Reveal>
+      </TabsContent>
+    </Tabs>
   );
 }

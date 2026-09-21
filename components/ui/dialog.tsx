@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "cn";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
@@ -55,30 +56,44 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
+  const reduced = useReducedMotion();
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
+        asChild
         data-slot="dialog-content"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          document
+            .querySelector<HTMLElement>('[data-slot="dialog-title"]')
+            ?.focus();
+        }}
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "minimal-scrollbar fixed inset-x-0 bottom-0 z-50 grid max-h-[92dvh] w-full gap-6 overflow-y-auto overscroll-contain rounded-t-[1.75rem] bg-popover px-5 pt-7 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-sm text-popover-foreground ring-1 ring-foreground/10 duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:max-w-sm sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:p-6 data-closed:animate-out data-closed:fade-out-0",
           className,
         )}
         {...props}
       >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute top-2 right-2"
-              size="icon-sm"
-            >
-              <XIcon />
-              <span className="sr-only">Close</span>
-            </Button>
-          </DialogPrimitive.Close>
-        )}
+        <motion.div
+          initial={reduced ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24, ease: "easeOut" }}
+        >
+          {children}
+          {showCloseButton && (
+            <DialogPrimitive.Close data-slot="dialog-close" asChild>
+              <Button
+                variant="ghost"
+                className="absolute top-2 right-2"
+                size="icon-sm"
+              >
+                <XIcon />
+                <span className="sr-only">Close</span>
+              </Button>
+            </DialogPrimitive.Close>
+          )}
+        </motion.div>
       </DialogPrimitive.Content>
     </DialogPortal>
   );
@@ -88,7 +103,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex flex-col gap-2 pr-8", className)}
       {...props}
     />
   );
@@ -128,8 +143,9 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
+      tabIndex={-1}
       className={cn(
-        "font-heading text-base leading-none font-medium",
+        "font-heading text-xl leading-snug tracking-tight font-semibold outline-none focus-visible:underline focus-visible:decoration-ring focus-visible:underline-offset-4",
         className,
       )}
       {...props}

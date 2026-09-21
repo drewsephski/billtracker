@@ -9,7 +9,7 @@ export function Heading({
   return (
     <Tag
       className={cn(
-        "font-heading tracking-tight text-balance",
+        "font-heading tracking-tight text-balance [overflow-wrap:anywhere]",
         level === 1
           ? "text-3xl font-semibold sm:text-4xl"
           : level === 2
@@ -30,7 +30,7 @@ export function Text({
   return (
     <p
       className={cn(
-        "leading-relaxed",
+        "leading-relaxed [overflow-wrap:anywhere]",
         muted && "text-muted-foreground",
         small ? "text-sm" : "text-base",
         className,
@@ -44,7 +44,7 @@ export function Eyebrow(props: ComponentProps<"p">) {
     <p
       {...props}
       className={cn(
-        "text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground",
+        "[overflow-wrap:anywhere] text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground",
         props.className,
       )}
     />

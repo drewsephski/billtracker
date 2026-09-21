@@ -50,31 +50,33 @@
 }
 
 :root {
+  --balance-background: #e9edff;
+  --balance-foreground: #293253;
   --warning: oklch(0.53 0.11 60);
-  --background: oklch(0.982 0.006 85);
-  --foreground: oklch(0.26 0.026 155);
+  --background: #f7f7fa;
+  --foreground: #262938;
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: #262938;
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.4 0.075 160);
+  --popover-foreground: #262938;
+  --primary: #4d5dca;
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.94 0.025 145);
-  --secondary-foreground: oklch(0.36 0.065 155);
-  --muted: oklch(0.957 0.008 85);
-  --muted-foreground: oklch(0.5 0.015 140);
+  --secondary: #eceeff;
+  --secondary-foreground: #4656b9;
+  --muted: #f0f0f5;
+  --muted-foreground: #6c6f80;
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0.012 85);
+  --border: #e7e7ee;
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: #7c8aee;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.75rem;
+  --radius: 1rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -86,6 +88,8 @@
 }
 
 .dark {
+  --balance-background: #292e4b;
+  --balance-foreground: #eef0ff;
   --warning: oklch(0.8 0.11 70);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -93,7 +97,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.78 0.1 155);
+  --primary: #a7b2ff;
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -153,7 +157,7 @@
     padding-inline: 1.25rem;
   }
   [data-slot="button"][data-size="sm"] {
-    min-height: 2.5rem;
+    min-height: 2.75rem;
     padding-inline: 0.75rem;
   }
   [data-slot="button"][data-size="icon"] {
@@ -166,7 +170,7 @@
     font-size: 1rem;
   }
   [data-slot="card"] {
-    --card-spacing: 1.5rem;
+    --card-spacing: 1.25rem;
   }
   [data-slot="badge"] {
     min-height: 1.6rem;
@@ -176,7 +180,7 @@
     height: 0.4rem;
   }
   [data-slot="dialog-content"] {
-    max-height: 90dvh;
+    max-height: 92dvh;
     overflow-y: auto;
   }
   [data-slot="avatar-fallback"] {
@@ -189,6 +193,94 @@
     *::after {
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Shared control sizing and surface treatments. */
+@layer utilities {
+  .minimal-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(
+        in oklab,
+        var(--muted-foreground) 35%,
+        transparent
+      )
+      transparent;
+    scrollbar-gutter: stable;
+  }
+  .minimal-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .minimal-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    margin-block: 1.25rem;
+  }
+  .minimal-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
+  }
+  .minimal-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+  @media (forced-colors: active) {
+    .minimal-scrollbar {
+      scrollbar-color: auto;
+    }
+  }
+}
+
+@layer base {
+  html {
+    scroll-padding-block: 5rem;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  [data-slot="button"] {
+    border-radius: 999px;
+  }
+  [data-slot="textarea"] {
+    font-size: 1rem;
+  }
+  [data-slot="input"],
+  [data-slot="select-trigger"] {
+    border-radius: 0.8rem;
+    min-height: 3rem;
+  }
+  [data-slot="dialog-close"] {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+  [data-slot="select-item"] {
+    min-height: 2.75rem;
+  }
+  .balance-surface {
+    background: var(--balance-background);
+    color: var(--balance-foreground);
+  }
+  .bill-row {
+    transition: background-color 180ms ease;
+  }
+  .bill-row:hover {
+    background: var(--muted);
+  }
+  @media (min-width: 640px) {
+    [data-slot="card"] {
+      --card-spacing: 1.5rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
     }
   }
 }

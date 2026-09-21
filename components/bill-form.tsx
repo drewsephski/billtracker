@@ -1,8 +1,9 @@
 "use client";
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Pencil, Repeat2, Loader2 } from "lucide-react";
+import { Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,14 +15,15 @@ import {
 } from "@/components/ui/dialog";
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldSet,
   FieldLegend,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
+import { Disclosure } from "@/components/ui/disclosure";
 import {
   Select,
   SelectContent,
@@ -33,7 +35,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/typography";
 import { Feedback } from "./feedback";
 import {
@@ -69,30 +70,46 @@ export function BillDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={bill || template ? "outline" : "default"}>
+        <Button
+          variant={bill || template ? "outline" : "default"}
+          size={bill || template ? "default" : "icon"}
+          className={
+            bill || template
+              ? undefined
+              : "size-12 gap-0 p-0 sm:h-11 sm:w-auto sm:gap-2 sm:px-4"
+          }
+          aria-label={bill ? "Edit bill" : template ? "Manage" : "Add a bill"}
+        >
           {bill || template ? (
             <Pencil data-icon="inline-start" />
           ) : (
-            <Plus data-icon="inline-start" />
+            <AnimatedIcon name="plus" />
           )}
-          {bill ? "Edit bill" : template ? "Manage" : "Add a bill"}
+          <span className={bill || template ? undefined : "hidden sm:inline"}>
+            {bill ? "Edit bill" : template ? "Manage" : "Add a bill"}
+          </span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent
+        className="gap-2 pt-5 sm:max-w-md sm:p-5"
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        <DialogHeader className="gap-1">
           <DialogTitle>
             {bill
               ? "Edit this bill"
               : template
                 ? "Edit recurring bill"
-                : "One less thing to keep track of."}
+                : "Add a bill"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription
+            className={bill || template ? undefined : "sr-only"}
+          >
             {bill
               ? "Changes apply to this bill only."
               : template
                 ? "Only future, ungenerated bills will change. Existing bills stay exactly as they are."
-                : "Add the bill, split it fairly, and you’re all on the same page."}
+                : "A few details. A fair share for everyone."}
           </DialogDescription>
         </DialogHeader>
         <BillForm
@@ -222,7 +239,7 @@ function BillForm({
         });
       }}
     >
-      <FieldGroup>
+      <FieldGroup className="gap-2.5 [&_[data-slot=input]]:min-h-11 [&_[data-slot=field][data-orientation=vertical]]:gap-1">
         <Field>
           <FieldLabel htmlFor="bill-name">Bill name</FieldLabel>
           <Input
@@ -234,7 +251,7 @@ function BillForm({
             maxLength={100}
           />
         </Field>
-        <FieldGroup className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <Field>
             <FieldLabel htmlFor="bill-amount">Total amount ($)</FieldLabel>
             <Input
@@ -262,39 +279,19 @@ function BillForm({
                 required
               />
             ) : (
-              <Input
+              <DatePicker
                 id="bill-date"
-                type="date"
                 name="dueDate"
-                min="2000-01-01"
-                max="2100-12-31"
                 defaultValue={bill?.dueDate || today}
-                required
+                today={today}
               />
             )}
           </Field>
-        </FieldGroup>
-        <Field>
-          <FieldLabel htmlFor="bill-category">Category</FieldLabel>
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger id="bill-category" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
+        </div>
         {!bill && (
-          <Field orientation="horizontal">
+          <Field orientation="horizontal" className="min-h-11">
             <FieldLabel htmlFor="bill-recurring">
-              <Repeat2 className="size-4" />
+              <AnimatedIcon name="refresh-cw" className="size-4" />
               {template ? "Generate monthly bills" : "Repeat every month"}
             </FieldLabel>
             <Switch
@@ -304,15 +301,10 @@ function BillForm({
             />
           </Field>
         )}
-        {(recurring || template) && (
-          <FieldDescription>
-            Due on the same day each month. For shorter months, we use the last
-            day. New bills appear one month ahead.
-          </FieldDescription>
-        )}
-        <Separator />
-        <FieldSet>
-          <FieldLegend>Who’s sharing this bill?</FieldLegend>
+        <FieldSet className="gap-2">
+          <FieldLegend className="mb-0 text-sm">
+            Who’s sharing this bill?
+          </FieldLegend>
           <Tabs
             value={mode}
             onValueChange={(v) => setMode(v as "equal" | "custom")}
@@ -326,9 +318,13 @@ function BillForm({
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          <FieldGroup className="gap-3">
+          <div className="divide-y divide-border/60 rounded-xl bg-muted/60">
             {members.map((member) => (
-              <Field key={member.id} orientation="horizontal">
+              <Field
+                key={member.id}
+                orientation="horizontal"
+                className="min-h-11 px-3"
+              >
                 <Checkbox
                   id={`member-${member.id}`}
                   checked={selected.includes(member.id)}
@@ -340,7 +336,10 @@ function BillForm({
                     )
                   }
                 />
-                <FieldLabel htmlFor={`member-${member.id}`} className="flex-1">
+                <FieldLabel
+                  htmlFor={`member-${member.id}`}
+                  className="min-h-10 flex-1"
+                >
                   {member.name}
                 </FieldLabel>
                 {mode === "custom" && selected.includes(member.id) ? (
@@ -355,10 +354,14 @@ function BillForm({
                       }))
                     }
                     placeholder="0.00"
-                    className="w-28"
+                    className="h-11 w-24 shrink-0 animate-in fade-in duration-150 motion-reduce:animate-none"
                   />
                 ) : (
-                  <Text small muted className="tabular-nums">
+                  <Text
+                    small
+                    muted
+                    className="flex h-11 w-24 shrink-0 items-center justify-end tabular-nums animate-in fade-in duration-150 motion-reduce:animate-none"
+                  >
                     {allocation.find((a) => a.memberId === member.id)
                       ? money(
                           allocation.find((a) => a.memberId === member.id)!
@@ -369,36 +372,62 @@ function BillForm({
                 )}
               </Field>
             ))}
-          </FieldGroup>
-          <FieldDescription>
-            {mode === "equal"
-              ? "Any extra cents are distributed consistently between roommates."
-              : "All selected shares must add up to the total."}
-          </FieldDescription>
+          </div>
         </FieldSet>
-        {!template && (
-          <Field>
-            <FieldLabel htmlFor="bill-notes">
-              Note <span className="text-muted-foreground">(optional)</span>
-            </FieldLabel>
-            <Textarea
-              id="bill-notes"
-              name="notes"
-              defaultValue={bill?.notes}
-              placeholder="Anything your roommates should know?"
-              maxLength={500}
-              rows={2}
-            />
-          </Field>
-        )}
+        <Disclosure
+          title="Category & optional note"
+          defaultOpen={Boolean(bill?.notes)}
+        >
+          <div className="space-y-2">
+            <Field orientation="horizontal" className="gap-3">
+              <FieldLabel htmlFor="bill-category">Category</FieldLabel>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger
+                  id="bill-category"
+                  className="min-h-11 w-auto min-w-0 flex-1"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {categories.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            {!template && (
+              <Field>
+                <FieldLabel htmlFor="bill-notes">
+                  Note <span className="text-muted-foreground">(optional)</span>
+                </FieldLabel>
+                <Textarea
+                  id="bill-notes"
+                  name="notes"
+                  defaultValue={bill?.notes}
+                  placeholder="Anything your roommates should know?"
+                  maxLength={500}
+                  rows={2}
+                />
+              </Field>
+            )}
+          </div>
+        </Disclosure>
         <Feedback state={state} />
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="sticky -bottom-5 -mx-1 flex items-center justify-end gap-2 border-t bg-popover px-1 pt-3 pb-1">
           {demo && (
-            <Button asChild variant="outline">
-              <Link href="/sign-up">Create your household</Link>
+            <Button asChild variant="ghost" className="mr-auto px-2">
+              <Link href="/sign-up">Create household</Link>
             </Button>
           )}
-          <Button type="submit" disabled={pending || selected.length === 0}>
+          <Button
+            type="submit"
+            className={demo ? undefined : "w-full sm:w-auto"}
+            disabled={pending || selected.length === 0}
+          >
             {pending && (
               <Loader2 className="animate-spin" data-icon="inline-start" />
             )}

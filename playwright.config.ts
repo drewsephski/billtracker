@@ -14,7 +14,14 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "mobile-webkit",
+      testMatch: "design.spec.ts",
+      use: { ...devices["iPhone 13"] },
+    },
+  ],
   webServer: {
     command: process.env.E2E_SERVER_COMMAND || "pnpm dev",
     url: process.env.E2E_BASE_URL || "http://localhost:3000",
