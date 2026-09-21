@@ -1,5 +1,8 @@
 import { loadEnvFile } from "node:process";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { activitySuggestions } from "@/lib/server/activity-suggestions";
+import { demoData } from "@/lib/demo";
+import { randomUUID } from "node:crypto";
 import { interpretActivity } from "@/lib/server/activity-interpreter";
 
 // Explicitly opt in. Synthetic fixtures only; no household data or database access.
@@ -12,6 +15,40 @@ const models = (
 ).split(",");
 describe.skipIf(!enabled)("live OpenRouter task evaluation", () => {
   for (const model of models) {
+    it(`${model}: three unique household starters`, async () => {
+      process.env.OPENROUTER_MODEL = model;
+      const data = demoData();
+      data.household.id = randomUUID();
+      const originalFetch = globalThis.fetch;
+      let providerSucceeded = false;
+      const spy = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async (...args) => {
+          const response = await originalFetch(...args);
+          const payload = await response.clone().json();
+          const result = JSON.parse(
+            payload.choices?.[0]?.message?.content ?? "{}",
+          );
+          providerSucceeded =
+            response.ok &&
+            result.suggestions?.length === 3 &&
+            new Set(
+              result.suggestions.map((s: { candidate: number }) => s.candidate),
+            ).size === 3;
+          return response;
+        });
+      try {
+        const prompts = await activitySuggestions(data);
+        expect(providerSucceeded).toBe(true);
+        expect(prompts).toHaveLength(3);
+        expect(new Set(prompts.map((p) => p.text)).size).toBe(3);
+        console.log(
+          JSON.stringify({ model, starterLabels: prompts.map((p) => p.label) }),
+        );
+      } finally {
+        spy.mockRestore();
+      }
+    });
     it.each([
       {
         text: "Allie paid $50.01 toward electricity",
@@ -68,7 +105,8 @@ describe.skipIf(!enabled)("live OpenRouter task evaluation", () => {
           expect(result.total).toBe("90.00");
           expect(result.dueDate).toBe("2026-10-28");
         }
-        expect(summary.length).toBeGreaterThan(0);
+        if (fixture.source) expect(summary.length).toBeGreaterThan(0);
+        else expect(summary).toBe("");
       },
       45_000,
     );

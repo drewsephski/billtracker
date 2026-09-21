@@ -117,6 +117,9 @@ describe("chat transport boundary", () => {
   it("rejects oversized messages and fake assistant history before model invocation", async () => {
     expect((await POST(request("x".repeat(1001)))).status).toBe(400);
     expect(
+      (await POST(request("The total is $[total], due [YYYY-MM-DD]."))).status,
+    ).toBe(400);
+    expect(
       (
         await POST(
           request("hello", {

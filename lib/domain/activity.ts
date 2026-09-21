@@ -8,7 +8,7 @@ import {
   validDate,
   type Category,
 } from "./bills";
-import type { ActivityGuidance } from "./activity-prompts";
+import { draftDollars, type ActivityGuidance } from "./activity-prompts";
 import type { BillView, HouseholdData, MemberView } from "./types";
 
 // Extraction only. No IDs, authorization decisions, or executable operations.
@@ -337,7 +337,7 @@ export function resolveActivity(
           prompts: [
             {
               label: `Use remaining ${money(share.amountCents - share.paidCents)}`,
-              text: `The contribution is ${money(share.amountCents - share.paidCents)}.`,
+              text: `The contribution is ${draftDollars(share.amountCents - share.paidCents)}.`,
             },
             {
               label: "Use a smaller amount",

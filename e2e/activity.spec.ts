@@ -86,6 +86,29 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
       await page.getByLabel("Describe bill activity").fill(text);
       await page.getByRole("button", { name: "Send activity" }).click();
     };
+    const starters = page
+      .getByLabel("Household prompt suggestions")
+      .getByRole("button");
+    await expect(starters).toHaveCount(3);
+    await page.screenshot({
+      path: `test-results/activity-starters-${test.info().project.name}.png`,
+      fullPage: true,
+    });
+    const firstStarter = starters.first();
+    await expect(firstStarter).toContainText("Electricity");
+    let interpretations = 0;
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/activity")
+        interpretations++;
+    });
+    await firstStarter.click();
+    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
+      /Electricity/,
+    );
+    expect(interpretations).toBe(0);
+    await page
+      .getByRole("button", { name: "Add a bill or source", exact: true })
+      .click();
     await page.getByLabel("Upload reference document").setInputFiles({
       name: "electricity.txt",
       mimeType: "text/plain",
@@ -170,12 +193,31 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
     await page
       .getByRole("button", { name: "Allie Smith", exact: true })
       .click();
+    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
+      "Allie Smith",
+    );
+    await expect(proposal).toHaveCount(0);
+    await page.getByRole("button", { name: "Send activity" }).click();
     await expect(proposal).toContainText("Allie Smith");
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await submit("I paid $10 toward water");
     await expect(
       page.getByText(/total bill amount and due date/),
     ).toBeVisible();
+    await page.getByLabel("Suggested next steps").scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: `test-results/activity-followup-${test.info().project.name}.png`,
+      fullPage: true,
+    });
+    await page
+      .getByRole("button", { name: "Enter total & due date", exact: true })
+      .click();
+    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
+      "The total is $[total], due [YYYY-MM-DD].",
+    );
+    await expect(
+      page.getByRole("button", { name: "Send activity" }),
+    ).toBeDisabled();
     await submit("The total is $90, due 2027-09-28");
     await expect(proposal).toContainText("Create Water");
     await expect(proposal).toContainText("Allie Jones");
@@ -259,6 +301,9 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
     // Ensure the chat remains compact and reachable at a keyboard-sized viewport.
     await page.setViewportSize({ width: 390, height: 450 });
     await submit("I paid $10 toward water");
+    await page
+      .getByRole("button", { name: "Add a bill or source", exact: true })
+      .click();
     await page
       .getByRole("button", { name: "Paste source", exact: true })
       .click();

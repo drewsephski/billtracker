@@ -1,4 +1,4 @@
-import { canManageShare, money } from "./bills";
+import { canManageShare } from "./bills";
 import type { HouseholdData } from "./types";
 
 export type ActivityPrompt = { label: string; text: string; choice?: number };
@@ -8,6 +8,8 @@ export type ActivityGuidance = {
 };
 export const promptPlaceholder =
   /\[(?:contribution|total|YYYY-MM-DD|amount|bill|name)\]/;
+export const draftDollars = (cents: number) =>
+  `$${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
 export type PromptCandidate = {
   kind: "existing" | "new";
   payer: string;
@@ -45,21 +47,29 @@ export function activityPromptCandidates(
         payer: share.memberId === data.viewer.id ? "I" : share.name,
         bill: bill.name,
         dueDate: bill.dueDate,
-        amount: money(share.amountCents - share.paidCents),
+        amount: draftDollars(share.amountCents - share.paidCents),
       });
       if (candidates.length >= 9) break;
     }
     if (candidates.length >= 9) break;
   }
   // These are explicitly NEW bill drafts, never claims that these bills exist.
-  for (const bill of ["Internet", "Electricity", "Water"])
+  const eligible = data.members
+    .filter((m) => canManageShare(data.viewer.role, data.viewer.id, m.id))
+    .sort(
+      (a, b) =>
+        Number(b.id === data.viewer.id) - Number(a.id === data.viewer.id),
+    );
+  ["Internet", "Electricity", "Water"].forEach((bill, i) => {
+    const payer = eligible[i % eligible.length];
     candidates.push({
       kind: "new",
-      payer: "I",
+      payer: !payer || payer.id === data.viewer.id ? "I" : payer.name,
       bill,
       dueDate: null,
       amount: null,
     });
+  });
   return candidates.filter(
     (candidate, i) =>
       candidates.findIndex(

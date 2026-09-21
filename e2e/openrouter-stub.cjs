@@ -17,6 +17,31 @@ if (process.env.HOMESHARE_E2E_LLM_STUB === "true") {
       );
     const body = JSON.parse(init.body);
     const prompt = JSON.parse(body.messages.at(-1).content);
+    if (prompt.purpose === "starter-prompts") {
+      return Response.json({
+        id: "stub-suggestions",
+        object: "chat.completion",
+        created: 1,
+        model: "test-model",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: JSON.stringify({
+                suggestions: [
+                  { candidate: 0, style: "paid" },
+                  { candidate: 1, style: "contributed" },
+                  { candidate: 2, style: "put" },
+                ],
+              }),
+            },
+            finish_reason: "stop",
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 },
+      });
+    }
     const text = prompt.message;
     if (text.includes("provider error"))
       return Response.json(
@@ -64,8 +89,9 @@ if (process.env.HOMESHARE_E2E_LLM_STUB === "true") {
       intent.intent = "unsupported";
     }
     const content = JSON.stringify({
-      summary:
-        "**Review** the contribution details below. Nothing has been recorded.",
+      summary: prompt.sources?.length
+        ? "**Review** the contribution details below. Nothing has been recorded."
+        : "",
       activity: intent,
     });
     const chunks = content
