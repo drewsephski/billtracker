@@ -137,6 +137,15 @@ The dedicated project is `homeshare` (`dark-thunder-86597548`, AWS us-east-2, Po
 
 Managed Better Auth is enabled on both. Localhost is allowed. Each branch has a different database connection and Auth base URL; always pair them. This workspace uses the published `@neondatabase/auth@0.5.0-beta` Next.js SDK. It is pinned because its package types currently differ from unreleased main-branch documentation. Its upstream auth-UI dependency reports peer warnings; this app uses only the Next.js server entrypoint and its own shadcn forms.
 
+Google sign-in uses the client-side Neon Auth proxy at `/api/auth` and the
+Google provider configured in Neon Console. The Google OAuth client must list
+`{NEON_AUTH_BASE_URL}/callback/google` as an authorized redirect URI for every
+Neon branch in use. The app does not read Google credentials at runtime; keep
+the client secret in Neon Auth’s provider configuration and never expose it as
+a `NEXT_PUBLIC_` variable. Local `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET` values may be retained only as operator inputs for
+branch configuration and must remain in ignored environment files.
+
 For a fresh setup: create a Neon project, enable Managed Better Auth, obtain the pooled/direct connection strings and Auth URL, configure email/password and email OTP, add your deployment origin to trusted domains, and apply `pnpm db:migrate`. Neon’s shared email provider is available; verify inbox delivery on your chosen domain before inviting real roommates. Do not migrate `neon_auth` yourself.
 
 ## Environment variables
