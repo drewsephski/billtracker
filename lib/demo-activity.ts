@@ -27,7 +27,7 @@ const intents: Record<DemoActivityKey, (today: string) => ActivityIntent> = {
   "own-share": () => ({
     intent: "contribution",
     payer: "I",
-    amount: "$25",
+    amount: "25",
     bill: "Internet",
     category: null,
     total: null,
@@ -39,10 +39,10 @@ const intents: Record<DemoActivityKey, (today: string) => ActivityIntent> = {
   "new-bill": (today) => ({
     intent: "contribution",
     payer: "I",
-    amount: "$30",
+    amount: "30",
     bill: "Household supplies",
     category: null,
-    total: "$90",
+    total: "90",
     dueDate: today,
     period: null,
     household: null,
@@ -51,7 +51,7 @@ const intents: Record<DemoActivityKey, (today: string) => ActivityIntent> = {
   "roommate-share": () => ({
     intent: "contribution",
     payer: "Emma",
-    amount: "$30.80",
+    amount: "30.80",
     bill: "Gas",
     category: null,
     total: null,

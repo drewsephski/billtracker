@@ -179,7 +179,7 @@ export function ActivityChat({
         {
           id: `demo-activity-assistant-${stamp}`,
           role: "assistant",
-          parts: [{ type: "text", text: preview.message }],
+          parts: [{ type: "text", text: "Review prepared below." }],
         },
       ];
       setMessages(previewMessages);

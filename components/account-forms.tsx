@@ -3,7 +3,6 @@ import { AnimatedIcon } from "@/components/icons/animated-icon";
 import Link from "next/link";
 import {
   useActionState,
-  useEffect,
   useState,
   useTransition,
   useSyncExternalStore,
@@ -386,13 +385,9 @@ export function VerifyForm({ next = "/dashboard" }: { next?: string }) {
   const [verified, verify, verifying] = useActionState(verifyEmail, {});
   const [codeRequested, setCodeRequested] = useState(false);
 
-  useEffect(() => {
-    if (sent.success) setCodeRequested(true);
-  }, [sent.success]);
-
   return (
     <div className="flex flex-col gap-6">
-      <form action={send}>
+      <form action={send} onSubmit={() => setCodeRequested(true)}>
         <input type="hidden" name="next" value={invitationDestination(next)} />
         <FieldGroup>
           <Feedback state={sent} />
