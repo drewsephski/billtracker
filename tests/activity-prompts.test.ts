@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { demoData } from "@/lib/demo";
 import {
   activityPromptCandidates,
+  activityClarificationGuidance,
   renderActivityPrompt,
   promptPlaceholder,
   draftDollars,
@@ -29,6 +30,20 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 describe("household-aware prompt drafts", () => {
+  it("provides clear editable templates for group-chat clarification", () => {
+    expect(activityClarificationGuidance.prompts.map((p) => p.label)).toEqual([
+      "Record a contribution",
+      "Add a new bill",
+    ]);
+    expect(activityClarificationGuidance.prompts[0].text).toContain(
+      "$[contribution]",
+    );
+    expect(activityClarificationGuidance.prompts[0].text).toContain("[bill]");
+    expect(activityClarificationGuidance.prompts[0].text).toContain(
+      "[due date]",
+    );
+    expect(activityClarificationGuidance.prompts[1].text).toContain("$[total]");
+  });
   it("keeps large draft amounts parseable without grouping commas", () => {
     expect(draftDollars(123456)).toBe("$1234.56");
   });

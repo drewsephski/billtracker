@@ -6,6 +6,19 @@ export type ActivityGuidance = {
   placeholder: string;
   prompts: ActivityPrompt[];
 };
+export const activityClarificationGuidance: ActivityGuidance = {
+  placeholder: "Use a template or describe your contribution…",
+  prompts: [
+    {
+      label: "Record a contribution",
+      text: "I paid $[contribution] toward my [bill] share, due [due date].",
+    },
+    {
+      label: "Add a new bill",
+      text: "I paid $[contribution] toward my [bill] share. The bill total is $[total], due [due date].",
+    },
+  ],
+};
 export const promptPlaceholder =
   /\[(?:contribution|total|due date|YYYY-MM-DD|amount|bill|name)\]/;
 export const draftDollars = (cents: number) =>

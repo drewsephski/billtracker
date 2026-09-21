@@ -9,7 +9,11 @@ import {
   validDate,
   type Category,
 } from "./bills";
-import { draftDollars, type ActivityGuidance } from "./activity-prompts";
+import {
+  activityClarificationGuidance,
+  draftDollars,
+  type ActivityGuidance,
+} from "./activity-prompts";
 import type { BillView, HouseholdData, MemberView } from "./types";
 
 // Extraction only. No IDs, authorization decisions, or executable operations.
@@ -155,7 +159,8 @@ export function resolveActivity(
     );
   if (intent.intent !== "contribution")
     return clarify(
-      "Tell me about one roommate’s contribution toward their own share of a bill.",
+      "To record this from chat, include your contribution amount, the bill name, and its due date. If this is a new bill, include the bill total too.",
+      activityClarificationGuidance,
     );
   if (
     intent.household &&
@@ -212,7 +217,8 @@ export function resolveActivity(
     });
   if (intent.incomplete)
     return clarify(
-      "Please clarify whether this is their own share contribution and which bill you mean. Include a due date if you mean a particular period.",
+      "Please clarify by including your contribution amount, the bill name, and its due date. For a new bill, include the bill total too.",
+      activityClarificationGuidance,
     );
   let amountCents: number;
   let totalCents: number | null = null;

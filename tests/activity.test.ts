@@ -177,6 +177,22 @@ describe("deterministic activity resolution", () => {
       message: expect.stringContaining("Please clarify"),
     });
   });
+  it("explains the required fields when a chat request is not an activity", () => {
+    const result = resolveActivity(
+      intent({ intent: "unsupported" }),
+      fixture(),
+    );
+    expect(result).toMatchObject({
+      kind: "clarification",
+      message: expect.stringContaining("contribution amount"),
+      guidance: {
+        prompts: [
+          { label: "Record a contribution" },
+          { label: "Add a new bill" },
+        ],
+      },
+    });
+  });
   it("clarifies conflicting totals/dates and does not match unrelated Other bills", () => {
     const d = fixture();
     expect(resolveActivity(intent({ total: "99" }), d)).toMatchObject({

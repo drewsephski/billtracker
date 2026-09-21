@@ -35,6 +35,7 @@ export default async function Page({
         viewerName={data.viewer.name}
         memberCount={data.members.length}
         timeZone={data.household.timeZone}
+        today={data.today}
         initial={demoChat(data)}
         demo
       />

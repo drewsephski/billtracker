@@ -14,6 +14,7 @@ export default async function ChatPage() {
       viewerName={data.viewer.name}
       memberCount={data.members.length}
       timeZone={data.household.timeZone}
+      today={data.today}
       initial={initial}
     />
   );

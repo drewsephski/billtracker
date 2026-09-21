@@ -18,7 +18,12 @@ import { ChatComposer } from "./chat-composer";
 import { ChatMentionText } from "./chat-mention-text";
 import { Blob } from "./blob";
 import { ChatBubble } from "./chat-bubble";
+import { ActivityDraft } from "./activity-draft";
 import { MessageResponse } from "./ai-elements/message";
+import {
+  activityClarificationGuidance,
+  promptPlaceholder,
+} from "@/lib/domain/activity-prompts";
 import {
   mergeChatMessages,
   nearChatBottom,
@@ -38,6 +43,7 @@ export function HouseChat({
   viewerName,
   memberCount,
   timeZone,
+  today,
   initial,
   demo = false,
 }: {
@@ -47,6 +53,7 @@ export function HouseChat({
   viewerName: string;
   memberCount: number;
   timeZone: string;
+  today: string;
   initial: ChatPage;
   demo?: boolean;
 }) {
@@ -367,7 +374,16 @@ export function HouseChat({
     }
   }
   function send() {
-    if (!text.trim() || blocked.current || streamPending) return;
+    if (
+      !text.trim() ||
+      blocked.current ||
+      streamPending ||
+      (continuation && promptPlaceholder.test(text))
+    ) {
+      if (continuation && promptPlaceholder.test(text))
+        setNotice("Fill in the highlighted details before sending.");
+      return;
+    }
     if (demo) {
       setNotice(
         "This is a read-only demo. Sign up to message your own household.",
@@ -391,6 +407,19 @@ export function HouseChat({
     void transmit(item);
     composer.current?.focus();
   }
+  function startClarification(id: string, draft?: string) {
+    const message = current.current.find((candidate) => candidate.id === id);
+    setContinuation(id);
+    setText(
+      draft ??
+        message?.reply?.guidance?.prompts[0]?.text ??
+        activityClarificationGuidance.prompts[0].text,
+    );
+    requestAnimationFrame(() => composer.current?.focus());
+  }
+  const continuationMessage = continuation
+    ? messages.find((message) => message.id === continuation)
+    : undefined;
   async function loadOlder() {
     if (demo || older || !messages.length) return;
     setOlder(true);
@@ -496,9 +525,8 @@ export function HouseChat({
                 timeZone={timeZone}
                 busy={busy}
                 action={action}
-                onClarify={(id) => {
-                  setContinuation(id);
-                  composer.current?.focus();
+                onClarify={(id, draft) => {
+                  startClarification(id, draft);
                 }}
               />
             ))}
@@ -587,18 +615,27 @@ export function HouseChat({
               </p>
             )}
             {continuation && (
-              <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                Clarifying your activity
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setContinuation(undefined);
-                    setText("");
-                  }}
-                >
-                  Dismiss
-                </Button>
+              <div className="mb-3 space-y-2 rounded-xl bg-muted/45 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium">Fill in the activity</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Tap a highlighted detail to enter it. Homeshare uses your
+                      message to match the bill and prepare a review.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="-mr-2 -mt-2 shrink-0"
+                    onClick={() => {
+                      setContinuation(undefined);
+                      setText("");
+                    }}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
               </div>
             )}
             <form
@@ -608,18 +645,29 @@ export function HouseChat({
                 send();
               }}
             >
-              <ChatComposer
-                textareaRef={composer}
-                disabled={!hydrated || streamPending}
-                placeholder={
-                  continuation
-                    ? "Add the missing details…"
-                    : "Message your home…"
-                }
-                value={text}
-                onChange={setText}
-                onSend={send}
-              />
+              {continuation ? (
+                <ActivityDraft
+                  textareaRef={composer}
+                  today={today}
+                  disabled={!hydrated || streamPending}
+                  placeholder={
+                    continuationMessage?.reply?.guidance?.placeholder ??
+                    activityClarificationGuidance.placeholder
+                  }
+                  value={text}
+                  onChange={setText}
+                  onSend={send}
+                />
+              ) : (
+                <ChatComposer
+                  textareaRef={composer}
+                  disabled={!hydrated || streamPending}
+                  placeholder="Message your home…"
+                  value={text}
+                  onChange={setText}
+                  onSend={send}
+                />
+              )}
               <Button
                 type="submit"
                 size="icon"
@@ -629,6 +677,7 @@ export function HouseChat({
                   !hydrated ||
                   streamPending ||
                   !text.trim() ||
+                  Boolean(continuation && promptPlaceholder.test(text)) ||
                   Boolean(continuation && busy)
                 }
               >

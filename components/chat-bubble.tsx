@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { Blob } from "./blob";
 import { ActivityConfirmation } from "./activity-chat";
+import { ActivityPromptChoices } from "./activity-prompts";
 import type { ChatMessage } from "@/lib/domain/chat";
 export type ChatActivityAction = {
   confirm?: boolean;
@@ -28,7 +29,7 @@ export function ChatBubble({
   timeZone: string;
   busy?: string;
   action: (id: string, input: ChatActivityAction) => Promise<void>;
-  onClarify: (id: string) => void;
+  onClarify: (id: string, draft?: string) => void;
 }) {
   const day = (date: string) =>
     new Intl.DateTimeFormat("en-US", {
@@ -123,7 +124,11 @@ export function ChatBubble({
               </p>
             )}
             {canAct && m.reply?.kind === "clarification" && (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 space-y-2">
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Include your contribution, the bill name, and due date. Add
+                  the bill total too when you’re creating a new bill.
+                </p>
                 {m.reply.choices?.map((choice, i) => (
                   <Button
                     key={i}
@@ -135,16 +140,23 @@ export function ChatBubble({
                     {choice}
                   </Button>
                 ))}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy === m.id}
-                  onClick={() => {
-                    onClarify(m.id);
-                  }}
-                >
-                  Clarify activity
-                </Button>
+                {m.reply.guidance?.prompts.length ? (
+                  <ActivityPromptChoices
+                    compact
+                    disabled={busy === m.id}
+                    prompts={m.reply.guidance.prompts}
+                    onPick={(prompt) => onClarify(m.id, prompt.text)}
+                  />
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy === m.id}
+                    onClick={() => onClarify(m.id)}
+                  >
+                    Fill in details
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"

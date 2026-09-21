@@ -280,6 +280,16 @@ export function ActivityChat({
     }
   }
   const p = reply?.proposal;
+  const assistantTexts = new Set(
+    messages
+      .filter((message) => message.role === "assistant")
+      .map((message) =>
+        message.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join(""),
+      ),
+  );
   return (
     <Card className="min-w-0" aria-label="Household activity chat">
       <CardContent className="space-y-4 p-5 sm:p-6">
@@ -368,7 +378,7 @@ export function ActivityChat({
                 : "Checking your activity…"}
             </Text>
           )}
-          {reply && (
+          {reply && !assistantTexts.has(reply.message) && (
             <Text small className="break-words">
               {reply.message}
             </Text>
