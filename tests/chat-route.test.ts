@@ -57,6 +57,17 @@ beforeEach(() => {
 });
 it("commits the human send before streaming AI and ignores no identity source", async () => {
   const body = { text: "hello", clientKey: crypto.randomUUID() };
+  mocks.process.mockImplementationOnce(
+    async (
+      _user,
+      _householdId,
+      _messageId,
+      options: { onTextDelta: (delta: string) => void },
+    ) => {
+      options.onTextDelta("Hello from a live stream.");
+      return "Hello from a live stream.";
+    },
+  );
   const response = await POST(request("POST", body));
   expect(response.status).toBe(200);
   expect(mocks.send).toHaveBeenCalledWith(user, home, body);
@@ -71,7 +82,10 @@ it("commits the human send before streaming AI and ignores no identity source", 
   );
   expect(mocks.after).not.toHaveBeenCalled();
   expect(response.headers.get("cache-control")).toBe("no-store");
-  expect(await response.text()).toContain('"type":"finish"');
+  const stream = await response.text();
+  expect(stream).toContain('"type":"text-delta"');
+  expect(stream).toContain("Hello from a live stream.");
+  expect(stream).toContain('"type":"finish"');
 });
 it("rejects cross-origin writes before any persistence or AI", async () => {
   expect(

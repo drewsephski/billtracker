@@ -298,7 +298,7 @@ export async function processChat(
   let engaged = directlyAddressesHomeshare(source.message.text);
   try {
     if (source.attempts > 3) throw new Error("Processing interrupted");
-    const mode = await triageChat(source.message.text);
+    const mode = await triageChat(source.message.text, options.signal);
     if (mode !== "silent") {
       engaged = true;
       const data = await readHousehold(user, householdId);
@@ -309,6 +309,7 @@ export async function processChat(
           history: [],
           householdName: data.household.name,
           today: data.today,
+          signal: options.signal,
         });
         reply = prepareActivity(user, data, intent, [source.message.text]);
       } else {
