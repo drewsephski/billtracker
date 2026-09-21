@@ -128,11 +128,9 @@ test("house chat: shared persistence, pagination, retries, private proposals, sw
     await composer.fill("@");
     const mention = page.getByRole("option", { name: /Homeshare AI/ });
     await expectChat(mention).toBeVisible();
-    await page
-      .getByLabel("House Chat", { exact: true })
-      .screenshot({
-        path: `test-results/chat-mention-picker-${test.info().project.name}.png`,
-      });
+    await page.getByLabel("House Chat", { exact: true }).screenshot({
+      path: `test-results/chat-mention-picker-${test.info().project.name}.png`,
+    });
     await mention.click();
     await expectChat(composer).toHaveValue("@Homeshare ");
     await expectChat(

@@ -55,14 +55,23 @@ beforeEach(() => {
     hasMore: false,
   });
 });
-it("commits the human send before scheduling AI and ignores no identity source", async () => {
+it("commits the human send before streaming AI and ignores no identity source", async () => {
   const body = { text: "hello", clientKey: crypto.randomUUID() };
   const response = await POST(request("POST", body));
   expect(response.status).toBe(200);
   expect(mocks.send).toHaveBeenCalledWith(user, home, body);
-  expect(mocks.process).not.toHaveBeenCalled();
-  expect(mocks.after).toHaveBeenCalledOnce();
+  expect(mocks.process).toHaveBeenCalledWith(
+    user,
+    home,
+    "message",
+    expect.objectContaining({
+      onTextDelta: expect.any(Function),
+      signal: expect.any(AbortSignal),
+    }),
+  );
+  expect(mocks.after).not.toHaveBeenCalled();
   expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(await response.text()).toContain('"type":"finish"');
 });
 it("rejects cross-origin writes before any persistence or AI", async () => {
   expect(

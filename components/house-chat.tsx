@@ -1,8 +1,11 @@
 "use client";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -15,6 +18,7 @@ import { ChatComposer } from "./chat-composer";
 import { ChatMentionText } from "./chat-mention-text";
 import { Blob } from "./blob";
 import { ChatBubble } from "./chat-bubble";
+import { MessageResponse } from "./ai-elements/message";
 import {
   mergeChatMessages,
   nearChatBottom,
@@ -85,6 +89,45 @@ export function HouseChat({
     "Content-Type": "application/json",
     "x-homeshare-household": householdId,
   };
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport<UIMessage>({
+        api: "/api/chat",
+        prepareSendMessagesRequest: ({ messages, body }) => ({
+          headers: {
+            "Content-Type": "application/json",
+            "x-homeshare-household": householdId,
+          },
+          body: {
+            text: messages
+              .at(-1)
+              ?.parts.filter((part) => part.type === "text")
+              .map((part) => part.text)
+              .join(""),
+            clientKey: (body as { clientKey?: string } | undefined)?.clientKey,
+          },
+        }),
+      }),
+    [householdId],
+  );
+  const {
+    messages: streamedMessages,
+    status: streamStatus,
+    error: streamError,
+    sendMessage,
+    setMessages: setStreamMessages,
+  } = useChat<UIMessage>({ transport });
+  const streamPending =
+    streamStatus === "submitted" || streamStatus === "streaming";
+  const liveAssistantText = useMemo(() => {
+    const message = [...streamedMessages]
+      .reverse()
+      .find((candidate) => candidate.role === "assistant");
+    return message?.parts
+      .filter((part) => part.type === "text")
+      .map((part) => part.text)
+      .join("");
+  }, [streamedMessages]);
   useLayoutEffect(() => {
     current.current = messages;
   }, [messages]);
@@ -218,7 +261,13 @@ export function HouseChat({
     };
   }, [demo, poll]);
   async function transmit(item: Outbox) {
-    if (demo || blocked.current || sending.current.has(item.clientKey)) return;
+    if (
+      demo ||
+      blocked.current ||
+      streamPending ||
+      sending.current.has(item.clientKey)
+    )
+      return;
     sending.current.add(item.clientKey);
     setOutbox((items) =>
       items.map((m) =>
@@ -226,34 +275,27 @@ export function HouseChat({
       ),
     );
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ text: item.text, clientKey: item.clientKey }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || "Message could not be sent.");
-      if (
-        !mounted.current ||
-        blocked.current ||
-        result.householdId !== householdId
-      )
-        return;
-      setMessages((m) => mergeChatMessages(m, [result.message]));
+      await sendMessage(
+        { text: item.text },
+        { body: { clientKey: item.clientKey } },
+      );
+      setStreamMessages([]);
       setOutbox((items) => items.filter((m) => m.clientKey !== item.clientKey));
-      // Do not advance the polling cursor here: another member may have sent
-      // an intervening message that the next incremental read still needs.
+      // Polling reconciles the streamed response with its durable household
+      // message, including proposal data that is intentionally not streamed.
       void poll();
     } catch (error) {
       if (!mounted.current || blocked.current) return;
+      setStreamMessages([]);
       setOutbox((items) =>
         items.map((m) =>
           m.clientKey === item.clientKey ? { ...m, failed: true } : m,
         ),
       );
       setNotice(
-        error instanceof Error ? error.message : "Message could not be sent.",
+        error instanceof Error
+          ? error.message
+          : streamError?.message || "Message could not be sent.",
       );
     } finally {
       sending.current.delete(item.clientKey);
@@ -325,7 +367,7 @@ export function HouseChat({
     }
   }
   function send() {
-    if (!text.trim() || blocked.current) return;
+    if (!text.trim() || blocked.current || streamPending) return;
     if (demo) {
       setNotice(
         "This is a read-only demo. Sign up to message your own household.",
@@ -486,6 +528,28 @@ export function HouseChat({
                 )}
               </div>
             ))}
+            {liveAssistantText && (
+              <div className="mt-5 flex gap-2">
+                <div className="w-7 shrink-0 pt-1">
+                  <Blob sizes="28px" className="size-7" />
+                </div>
+                <div className="min-w-0 max-w-[88%] sm:max-w-[75%]">
+                  <p className="mb-1 text-[11px] text-muted-foreground">
+                    Homeshare · AI
+                  </p>
+                  <div className="rounded-2xl border bg-background px-3.5 py-2.5 text-sm leading-relaxed">
+                    <MessageResponse isAnimating={streamPending}>
+                      {liveAssistantText}
+                    </MessageResponse>
+                  </div>
+                </div>
+              </div>
+            )}
+            {streamPending && !liveAssistantText && (
+              <p className="mt-5 text-xs text-muted-foreground" role="status">
+                Homeshare is thinking…
+              </p>
+            )}
           </div>
           {newMessages && (
             <Button
@@ -546,7 +610,7 @@ export function HouseChat({
             >
               <ChatComposer
                 textareaRef={composer}
-                disabled={!hydrated}
+                disabled={!hydrated || streamPending}
                 placeholder={
                   continuation
                     ? "Add the missing details…"
@@ -562,7 +626,10 @@ export function HouseChat({
                 className="size-11 shrink-0 rounded-full"
                 aria-label="Send message"
                 disabled={
-                  !hydrated || !text.trim() || Boolean(continuation && busy)
+                  !hydrated ||
+                  streamPending ||
+                  !text.trim() ||
+                  Boolean(continuation && busy)
                 }
               >
                 {busy && continuation ? (

@@ -15,7 +15,12 @@ import { inHousehold } from "./households";
 import { readHousehold } from "./queries";
 import { interpretActivity } from "./activity-interpreter";
 import { prepareActivity } from "./activity";
-import { triageChat, answerChat } from "./chat-ai";
+import { triageChat, answerChat, streamAnswerChat } from "./chat-ai";
+
+type ProcessChatOptions = {
+  onTextDelta?: (delta: string) => void;
+  signal?: AbortSignal;
+};
 
 export async function lockChat(tx: Transaction, householdId: string) {
   await tx.execute(
@@ -249,6 +254,7 @@ export async function processChat(
   user: Identity,
   householdId: string,
   sourceId: string,
+  options: ProcessChatOptions = {},
 ) {
   const lease = randomUUID();
   const source = await inHousehold(user, householdId, async (tx, actor) => {
@@ -309,11 +315,19 @@ export async function processChat(
         const recent = await listChat(user, householdId, {
           before: String(source.message.sequence),
         });
-        reply = await answerChat(
-          source.message.text,
-          recent.messages.map((m) => ({ name: m.senderName, text: m.text })),
-          data,
-        );
+        const recentMessages = recent.messages.map((m) => ({
+          name: m.senderName,
+          text: m.text,
+        }));
+        reply = options.onTextDelta
+          ? await streamAnswerChat(
+              source.message.text,
+              recentMessages,
+              data,
+              options.onTextDelta,
+              options.signal,
+            )
+          : await answerChat(source.message.text, recentMessages, data);
       }
     }
   } catch {
@@ -354,6 +368,7 @@ export async function processChat(
           ),
         );
   });
+  return reply;
 }
 export async function recoverChat(user: Identity, householdId: string) {
   const pending = await inHousehold(user, householdId, async (tx, actor) =>
