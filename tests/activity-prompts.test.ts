@@ -78,6 +78,27 @@ describe("household-aware prompt drafts", () => {
         "The due date is [due date].",
       );
   });
+  it("offers bill follow-ups only for the named person's unpaid shares", () => {
+    const data = demoData();
+    const result = resolveActivity({ ...base, bill: null }, data);
+    expect(result.kind).toBe("clarification");
+    if (result.kind !== "clarification") return;
+    for (const prompt of result.guidance?.prompts ?? []) {
+      const bill = data.bills.find((b) => prompt.text.includes(b.name))!;
+      expect(
+        bill.splits.some(
+          (s) => s.memberId === data.viewer.id && s.paidCents < s.amountCents,
+        ),
+      ).toBe(true);
+      expect(prompt.text).toContain(dateLabel(bill.dueDate, true));
+    }
+    const unknown = resolveActivity(
+      { ...base, bill: null, payer: "Unknown" },
+      data,
+    );
+    if (unknown.kind === "clarification")
+      expect(unknown.guidance?.prompts).toEqual([]);
+  });
   it("uses Luna's structured choices, excludes identity metadata, and coalesces identical requests", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "test-key");
     vi.stubEnv("OPENROUTER_MODEL", "openai/gpt-5.6-luna");

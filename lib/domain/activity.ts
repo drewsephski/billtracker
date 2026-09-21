@@ -193,10 +193,15 @@ export function resolveActivity(
       placeholder: "Which bill and due date?",
       prompts: data.bills
         .filter((b) =>
-          b.splits.some((s) =>
-            s.paidCents < s.amountCents &&
-            canManageShare(data.viewer.role, data.viewer.id, s.memberId) &&
-            memberCandidates(intent.payer!, data.members, data.viewer.id).some((m) => m.id === s.memberId),
+          b.splits.some(
+            (s) =>
+              s.paidCents < s.amountCents &&
+              canManageShare(data.viewer.role, data.viewer.id, s.memberId) &&
+              memberCandidates(
+                intent.payer!,
+                data.members,
+                data.viewer.id,
+              ).some((m) => m.id === s.memberId),
           ),
         )
         .slice(0, 3)
@@ -372,7 +377,7 @@ export function resolveActivity(
   }
   if (!totalCents || !intent.dueDate)
     return clarify(
-      `I don’t see a matching ${intent.bill} bill yet. What’s ${!totalCents && !intent.dueDate ? "the total bill amount and due date" : !totalCents ? "the total bill amount" : "the due date (including year)"}? The contribution is separate from the total.`,
+      `I don’t see a matching ${intent.bill} bill yet. What’s ${!totalCents && !intent.dueDate ? "the total bill amount and due date" : !totalCents ? "the total bill amount" : "the due date (including year)"}?`,
       {
         placeholder:
           !totalCents && !intent.dueDate

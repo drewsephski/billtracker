@@ -148,3 +148,11 @@ This test is skipped without the designated development environment and explicit
 - The existing Chromium smoke suite passed all three flows, including the manual signup → household → invitation → bill → payment → reversal/history lifecycle.
 - The client production bundle contains no OpenRouter or proposal-signing environment variable references.
 - Real OpenRouter interpretation was tested with synthetic inputs as recorded above. Production migration, deployed authenticated behavior, physical-device keyboard behavior, and real-world document extraction remain separate verification layers.
+
+## Draft-entry UX refinement
+
+Follow-up choices are compact and use only the missing details; bill choices exclude settled or unrelated shares. All displayed draft dates include a readable month and year. Draft placeholders are highlighted inside a native textarea, selected as a whole on click, and editable through small amount/name controls. The shadcn Calendar/Popover date picker opens on the active household's local today without preselecting a financial due date. Applying a field replaces the whole placeholder; incomplete drafts remain blocked on both client and server.
+
+Generated source summaries use AI Elements MessageResponse with streaming Markdown, and are labeled separately from the brief progress indicator and deterministic confirmation/question. Private reasoning stays excluded. The interpreter prompt limits source summaries to two short sentences, with no process narration. Source attachment/review behavior is unchanged.
+
+Refinement verification (2026-09-21): formatting, lint, typecheck, production build, 134 ordinary tests, 19 development Postgres tests, and 8 real OpenRouter Luna tests passed. The live set includes readable absolute dates and “tomorrow” against an explicit reference date. Chromium passed the final authenticated flow, including placeholder selection, invalid-amount correction, Escape focus restoration, and current-month calendar selection. iPhone WebKit passed the full flow before the final Escape-focus refinement; subsequent reruns were blocked before the dashboard by Neon Auth session-fetch HTTP 429 responses. Recheck that last WebKit refinement after the provider cooldown. No production deployment or migration was performed for this refinement.

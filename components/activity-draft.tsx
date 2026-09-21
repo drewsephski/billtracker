@@ -35,12 +35,14 @@ export function ActivityDraft({
   textareaRef: RefObject<HTMLTextAreaElement | null>;
 }) {
   const mirror = useRef<HTMLDivElement>(null);
+  const returnToDraft = useRef(false);
   const fields = draftPlaceholders(value);
   const [editor, setEditor] = useState<string>();
   const [replacement, setReplacement] = useState("");
   const [error, setError] = useState("");
   function replace(field: (typeof fields)[number], text: string) {
     const next = replaceDraftPlaceholder(value, field.start, field.token, text);
+    returnToDraft.current = true;
     onChange(next);
     setEditor(undefined);
     setError("");
@@ -146,7 +148,7 @@ export function ActivityDraft({
                 return (
                   <DatePicker
                     key={key}
-                    id="activity-due-date"
+                    id={`activity-due-date-${field.start}`}
                     name="activityDraftDueDate"
                     defaultValue=""
                     value=""
@@ -164,6 +166,7 @@ export function ActivityDraft({
                   key={key}
                   open={editor === key}
                   onOpenChange={(open) => {
+                    returnToDraft.current = false;
                     setEditor(open ? key : undefined);
                     setReplacement("");
                     setError("");
@@ -183,7 +186,9 @@ export function ActivityDraft({
                     align="start"
                     collisionPadding={12}
                     className="w-[min(18rem,calc(100vw-1.5rem))] space-y-2 p-3"
-                    onCloseAutoFocus={(event) => event.preventDefault()}
+                    onCloseAutoFocus={(event) => {
+                      if (returnToDraft.current) event.preventDefault();
+                    }}
                   >
                     <label
                       htmlFor="activity-draft-field"

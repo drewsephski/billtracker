@@ -66,7 +66,7 @@ export function DatePicker({
             }
           >
             <span className="truncate">
-              {value ? dateLabel(value, true) : placeholder}
+              {value ? dateLabel(value) : placeholder}
             </span>
             <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
           </Button>

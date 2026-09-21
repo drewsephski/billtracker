@@ -218,16 +218,36 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
     await expect(
       page.getByRole("button", { name: "Send activity" }),
     ).toBeDisabled();
+    // Selecting a draft selects the whole first placeholder for immediate typing.
+    await expect(page.getByLabel("Describe bill activity")).toBeFocused();
+    expect(
+      await page.getByLabel("Describe bill activity").evaluate((element) => {
+        const input = element as HTMLTextAreaElement;
+        return input.value.slice(input.selectionStart, input.selectionEnd);
+      }),
+    ).toBe("[total]");
     const details = page.getByLabel("Fill in draft details");
     await expect(
       page.locator("mark").filter({ hasText: "[total]" }),
     ).toBeVisible();
+    await page.getByLabel("Household activity chat").screenshot({
+      path: `test-results/activity-editable-draft-${test.info().project.name}.png`,
+    });
+    await details
+      .getByRole("button", { name: "Bill total", exact: true })
+      .click();
+    await page.keyboard.press("Escape");
+    await expect(
+      details.getByRole("button", { name: "Bill total", exact: true }),
+    ).toBeFocused();
     await details
       .getByRole("button", { name: "Bill total", exact: true })
       .click();
     await page.getByLabel("Bill total", { exact: true }).fill("0");
     await page.getByRole("button", { name: "Apply", exact: true }).click();
-    await expect(page.getByRole("alert")).toContainText("positive amount");
+    await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+      "positive amount",
+    );
     await page.getByLabel("Bill total", { exact: true }).fill("90");
     await page.getByRole("button", { name: "Apply", exact: true }).click();
     await expect(page.getByLabel("Describe bill activity")).toHaveValue(
@@ -255,6 +275,9 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
       .getByRole("combobox", { name: /year/i })
       .selectOption("2027");
     await calendar.getByRole("combobox", { name: /month/i }).selectOption("8");
+    await calendar.screenshot({
+      path: `test-results/activity-date-picker-${test.info().project.name}.png`,
+    });
     await calendar
       .getByRole("button", { name: /September 28th, 2027/ })
       .click();
