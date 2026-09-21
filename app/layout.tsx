@@ -24,7 +24,8 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   applicationName: "Homeshare",
   appleWebApp: { capable: true, title: "Homeshare", statusBarStyle: "default" },
-  other: { "mobile-web-app-capable": "yes" },
+  // Next emits mobile-web-app-capable from appleWebApp; retain iOS compatibility too.
+  other: { "apple-mobile-web-app-capable": "yes" },
   title: {
     default: "Homeshare — A little less bill stress",
     template: "%s · Homeshare",

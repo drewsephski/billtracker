@@ -34,7 +34,10 @@ export function InviteLinkActions({ url }: { url: string }) {
                   url,
                 });
               } catch (error) {
-                if (!(error instanceof Error && error.name === "AbortError"))
+                if (!(
+                  (error instanceof Error || error instanceof DOMException) &&
+                  error.name === "AbortError"
+                ))
                   setError(
                     "Couldn’t share the invite. Copy the link below instead.",
                   );

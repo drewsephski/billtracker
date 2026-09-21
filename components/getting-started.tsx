@@ -48,15 +48,18 @@ export function GettingStarted({ data }: { data: HouseholdData }) {
   );
   const progress = useSyncExternalStore(subscribe, snapshot, () => initial);
   useEffect(() => {
-    if (!progress) return;
-    memory.set(key, progress);
+    // Re-read storage: the first hydration render uses the server snapshot.
+    // Never overwrite saved progress with that initial presentation state.
+    const current = snapshot();
+    if (!current) return;
+    memory.set(key, current);
     try {
-      localStorage.setItem(key, progress);
+      localStorage.setItem(key, current);
     } catch {
       /* Keep progress in memory. */
     }
     window.dispatchEvent(new Event("getting-started-change"));
-  }, [key, progress]);
+  }, [key, progress, snapshot]);
   if (!progress || progress === "complete") return null;
   return (
     <Card className="bg-secondary/40 ring-0" size="sm">
