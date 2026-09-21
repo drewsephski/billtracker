@@ -35,25 +35,39 @@ export function SettingsView({
         <Text muted>Your household and account settings.</Text>
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4">
-            <div className="space-y-2">
-              <CardTitle>Your household</CardTitle>
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader className="grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4">
+              <div className="space-y-2">
+                <CardTitle>Your household</CardTitle>
+                <CardDescription>
+                  {data.viewer.role === "owner"
+                    ? "A few details that keep everyone on the same page."
+                    : "Your household owner manages these settings."}
+                </CardDescription>
+              </div>
+              <Blob variant="home" sizes="80px" className="size-20" />
+            </CardHeader>
+            <CardContent>
+              <HouseholdForm
+                household={data.household}
+                readOnly={demo || data.viewer.role !== "owner"}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Light or cozy?</CardTitle>
               <CardDescription>
-                {data.viewer.role === "owner"
-                  ? "A few details that keep everyone on the same page."
-                  : "Your household owner manages these settings."}
+                Follows your device by default. Your light or dark preference is
+                saved on this device.
               </CardDescription>
-            </div>
-            <Blob variant="home" sizes="80px" className="size-20" />
-          </CardHeader>
-          <CardContent>
-            <HouseholdForm
-              household={data.household}
-              readOnly={demo || data.viewer.role !== "owner"}
-            />
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <ThemePreferenceControl />
+            </CardContent>
+          </Card>
+        </div>
         <div className="flex flex-col gap-6">
           {!demo && (
             <ConnectedAccounts
@@ -87,18 +101,6 @@ export function SettingsView({
                   </form>
                 </>
               )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Light or cozy?</CardTitle>
-              <CardDescription>
-                Follows your device by default. Your light or dark preference is
-                saved on this device.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ThemePreferenceControl />
             </CardContent>
           </Card>
           <Card>
