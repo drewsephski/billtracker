@@ -39,6 +39,9 @@ A household bill tracker, not a payments platform. Use pnpm; TypeScript strict m
 - `lib/server/queries.ts`: consistent-snapshot tenant reads, no framework auth dependencies.
 - `lib/server/current.ts`: React request memoization and authenticated route context.
 - `lib/server/actions.ts`: Next.js boundary; derive session identity, validate, call services, revalidate.
+- `lib/server/active-household.ts`: HTTP-only active-household preference, always resolved against the current account’s memberships.
+- `lib/client/`: lightweight browser-only theme and first-run presentation state; never authorization or financial truth.
+- `app/manifest.ts` + `app/apple-icon.png` + `public/icons/`: install metadata and icons; no offline financial writes or service worker.
 - `lib/demo.ts` + `/demo`: read-only fixtures. Never add a demo-auth fallback.
 
 ## Non-negotiable invariants
@@ -50,7 +53,7 @@ A household bill tracker, not a payments platform. Use pnpm; TypeScript strict m
 5. No paid boolean on bills. Payments settle individual splits. Reversals retain original rows. An old undo action must not reverse a newer payment.
 6. Bill lock serializes financial edits and payment mutations. No financial editing once ANY payment history exists, including reversed payments. Version numbers prevent stale edits.
 7. Monthly templates never update generated bills. Preserve the anchor day through short months. Unique template/period and row locks make generation idempotent. Resume skips missed paused periods. Catch-up is bounded to 24 instances per template per invocation.
-8. Composite tenant foreign keys and deferred balance triggers are part of the schema. Keep custom migration `0002_financial_invariants.sql` when regenerating. Test migrations against development first.
+8. Composite tenant foreign keys and deferred balance triggers are part of the schema. Keep custom migration `0002_financial_invariants.sql` when regenerating. Keep migration `0003_pretty_wraith.sql`, which replaces the single-household uniqueness constraint with `(household_id, user_id)` and adds a user index. Test migrations against development first.
 9. Invitation tokens are 256-bit random, stored hashed, seven-day expiry, email-bound, owner-issued, revocable, transactionally consumed. Verified email required for acceptance.
 10. No secrets, real user data, test credentials, or auth bypasses in tracked files. Test SQL verification applies ONLY to generated reserved example.com accounts on the designated development branch.
 11. Existing profile IDs mirror Neon auth IDs; Neon owns the `neon_auth` schema. Do not migrate provider-managed tables. Household membership is the authorization source of truth.
@@ -59,4 +62,6 @@ A household bill tracker, not a payments platform. Use pnpm; TypeScript strict m
 
 ## Verification and deployment
 
-See `README.md` and `docs/IMPLEMENTATION.md`. Distinguish local source checks, real database tests, auth/browser lifecycle, email delivery, and deployed behavior. Never describe an untested layer as verified.
+Accounts may own or join multiple homes; creation/acceptance selects the new home, stale preferences fall back to the oldest membership, and permissions remain per household.
+
+See `README.md`, `docs/IMPLEMENTATION.md`, and the report-only `docs/PAYMENT-SEMANTICS.md`. The secret-free GitHub checks workflow runs source/unit/build checks only; real Neon integration/authenticated E2E require a trusted, explicitly designated development environment. Distinguish local source checks, real database tests, auth/browser lifecycle, email delivery, and deployed behavior. Never describe an untested layer as verified.

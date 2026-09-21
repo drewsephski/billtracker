@@ -36,6 +36,16 @@ Server Components render the app. Small Client Components handle dialogs, filter
 
 `lib/server/households.ts` provides the authorization boundary: session-derived identity → membership check → role enforcement → scoped transaction. Reads use a repeatable-read snapshot so concurrent mutations cannot combine mismatched bills and splits. React cache is request-local only; private household data is never globally cached.
 
+### Mobile experience
+
+New owner households (one member, zero bills) get a compact dashboard card linking to the existing invite form and bill editor. Completed prompts disappear. Progress is a browser-local UI preference scoped to user and household; it does not change membership, authorization, or onboarding. Established households do not start this guidance. A different device cannot recover partially completed guidance without first having observed that household in its initial state. Blocked storage falls back to memory.
+
+After creating an email-bound invitation, supported browsers show **Share invite**, opening the native share sheet with a short message and URL. **Copy link** remains available, with selectable text if clipboard access fails. Cancelling the share sheet is not an error and does not revoke the invitation. Homeshare does not send SMS or invitation emails.
+
+The manifest launches `/dashboard` in standalone mode. Existing authentication handles signed-out launches. Opaque 192/512px icons, a maskable icon, and a 180px Apple touch icon reuse the existing house mark. In iPhone Safari, use Share → Add to Home Screen. Safe-area layout remains enabled; there is no service worker, offline cache, or offline financial-write queue. Installation, standalone auth/session behavior and the native share sheet still need real-device verification.
+
+Appearance defaults to the system, reacts to system changes, and saves explicit light/dark choices locally across visits and tabs. Settings → Appearance → Use device setting clears the override. An inline head script applies the appearance before body rendering; browser storage failures do not break the page.
+
 ### Browser sessions
 
 Email sign-in explicitly requests a persistent session. `proxy.ts` checks existing sessions through Neon's auth handler before page rendering and forwards renewed cookies to both the browser and the current request. This is necessary because Server Components cannot write cookies. It bypasses the SDK's session-data cache so upstream session-token renewals are preserved. Signed-in visitors to `/` go straight to `/dashboard`; public pages remain accessible when signed out. Authorization still checks the provider session and household membership on the server.
@@ -63,7 +73,7 @@ Composite foreign keys prevent linking records across households. Unique indexes
 
 All members can read household bills, see shares/history, and add bills. Members mark/undo only their own shares. The owner may record any share, manage invitations, change household settings, and edit recurring templates. Owners or original creators can edit bills only before any payment history exists. Paid records cannot be rewritten even after a reversal. Financial edits and payments take the same bill lock, and stale edit versions are rejected.
 
-Invitations are shareable links, not automatically emailed. The recipient must sign in with the invited address and verify that email using Neon’s email OTP. Links expire after seven days; replacing or revoking one invalidates it. Acceptance is atomic and replay-safe. No household details are revealed before membership is verified.
+Invitations are shareable links, not automatically emailed. The recipient must sign in with the invited address and verify that email using Neon’s email OTP. Links expire after seven days; replacing or revoking one invalidates it. Acceptance is atomic and replay-safe. A valid invitation previews the household name and invited email; bills and household records remain private until membership is verified.
 
 Application-level authorization is active. Postgres RLS is not enabled. Transactions set `app.user_id` and `app.household_id`, and tenant columns/composite keys prepare the schema for future RLS. Before enabling RLS, use a restricted non-owner DB role and add explicit policies; do not assume `ENABLE ROW LEVEL SECURITY` alone protects an owner connection.
 
@@ -110,6 +120,14 @@ The opt-in database suite uses an explicitly designated development database (`S
 
 Playwright covers responsive demo browsing, filters, split previews, dark mode, unauthenticated route protection, cron rejection, and real managed-auth signup → household → invite → second roommate → bill → individual payments → reversal/history. The full flow is development-only and creates uniquely named example.com test accounts/households, retained for debugging. Email verification is a clearly identified database fixture; inbox delivery is not claimed as tested. Artifacts are under ignored `test-results/`.
 
+### Continuous integration
+
+`.github/workflows/checks.yml` runs frozen pnpm install, formatting, lint, typecheck, unit tests and production build for pull requests, pushes to main and manual dispatch. It has read-only repository permissions, receives no production secrets and explicitly disables DB tests/seeding. Builds do not run migrations.
+
+Real Neon integration and authenticated E2E stay explicitly manual/trusted: use an isolated development branch with `SEED_ALLOWED=true` and branch-specific local credentials. Never expose these credentials to untrusted PR workflows. For public UI checks without writes, run `SEED_ALLOWED=false pnpm test:e2e`; install both Chromium and WebKit for the configured projects.
+
+See [the payment-semantics decision report](docs/PAYMENT-SEMANTICS.md) before changing provider payment status or the dashboard balance. Neither semantic change is part of this release.
+
 ## Neon setup
 
 The dedicated project is `homeshare` (`dark-thunder-86597548`, AWS us-east-2, Postgres 17):
@@ -148,7 +166,7 @@ A production build and local managed-auth flow do not establish deployed correct
 
 ## Deliberate limits and next improvements
 
-One household per account; USD only; up to 30 members; monthly recurrence; payments settle a complete share. No funds move through Homeshare. Invitations are copied/shared manually. No member-removal/ownership-transfer UI yet, because preserving historical obligations requires a separate archival design. Bills with payment history cannot be edited or deleted; mistaken payments can be reversed. No real-time subscriptions; refresh sees other roommates’ updates. Dark mode is a per-visit toggle. History loads the household’s records; add cursor pagination when volumes justify it.
+Multiple households per account with an authorized active-household switcher; USD only; up to 30 members; monthly recurrence; payments settle a complete share. No funds move through Homeshare. Invitations are copied/shared manually. No member-removal/ownership-transfer UI yet, because preserving historical obligations requires a separate archival design. Bills with payment history cannot be edited or deleted; mistaken payments can be reversed. No real-time subscriptions; refresh sees other roommates’ updates. Appearance follows the device by default, with a persisted light/dark override and a device-setting reset in Settings. History loads the household’s records; add cursor pagination when volumes justify it.
 
 Best next work: verify production email/deployment lifecycle, member departure with historical membership retention, a clear unpaid-bill cancellation/archive flow, optional reminders and payment links, history pagination, and defense-in-depth RLS with a restricted runtime role.
 

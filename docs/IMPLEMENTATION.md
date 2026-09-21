@@ -9,7 +9,7 @@
 ## Model and security decisions (before implementation)
 
 - Neon owns auth users/sessions; application profiles are keyed by verified auth user IDs (no passwords in app DB).
-- Households have an IANA time zone and USD currency. Members have owner/member roles. One active household per account for this first version.
+- Households have an IANA time zone and USD currency. Members have owner/member roles. Accounts can belong to multiple households; an HTTP-only preference selects one active household, validated against membership on each request. Migration `0003_pretty_wraith.sql` replaces account-wide membership uniqueness with `(household_id, user_id)` uniqueness and adds a user lookup index without rewriting financial records.
 - Invitations are email-bound, expire after seven days, store SHA-256 token hashes, and are consumed atomically. Link sharing is deliberate; no email delivery dependency.
 - Household members may create bills and record/undo their own payments. Owners may record/undo any member's payment, edit unpaid bills, and manage household invitations/templates. Bill creators may edit their own unpaid bills.
 - Every household service executes in a transaction, verifies membership from the session user, and scopes resources by household_id. Composite foreign keys prevent cross-household associations. No browser database access. A transaction-local household/user context is set for future RLS.
@@ -17,6 +17,12 @@
 - Monthly templates own member allocations and their next generation date. Unique (template_id, period) plus row locking makes generation idempotent. Editing a template affects only ungenerated periods. Days 29–31 clamp to month end without drifting the anchor day.
 - Generation runs lazily on authenticated app access and through a protected daily cron, with a one-month lookahead and bounded catch-up batches.
 - UI demo uses explicit read-only fixtures in a separate public /demo route, never an authentication bypass.
+
+## Mobile release slice
+
+Dashboard guidance is optional and observed only for new owner households (one member, zero bills), with browser-local progress per user/household. Native invitation sharing retains clipboard/manual fallback. Appearance uses system defaults, persisted explicit overrides, and a pre-paint head script. Install metadata and raster icons preserve existing branding and safe areas, with no offline financial writes. Repository CI is secret-free; trusted Neon/authenticated lifecycle checks remain manual.
+
+Provider-payment and roommate-settlement semantics are unchanged; see [the decision report](PAYMENT-SEMANTICS.md).
 
 ## Official sources researched September 20, 2026
 

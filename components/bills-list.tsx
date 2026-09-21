@@ -1,4 +1,5 @@
 "use client";
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
