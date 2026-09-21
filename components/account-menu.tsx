@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { House, LogOut, Settings, Sparkles, Users } from "lucide-react";
 import { signOut } from "@/lib/server/actions";
+import { AnimatedIcon } from "@/components/icons/animated-icon";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,19 +64,19 @@ export function AccountMenu({
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
             <Link href={`${prefix}/dashboard`}>
-              <House data-icon="inline-start" />
+              <AnimatedIcon name="home" data-icon="inline-start" />
               Home
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href={`${prefix}/household`}>
-              <Users data-icon="inline-start" />
+              <AnimatedIcon name="users" data-icon="inline-start" />
               Household
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href={`${prefix}/settings`}>
-              <Settings data-icon="inline-start" />
+              <AnimatedIcon name="settings" data-icon="inline-start" />
               Settings
             </Link>
           </DropdownMenuItem>
@@ -86,7 +86,7 @@ export function AccountMenu({
           <DropdownMenuGroup>
             <DropdownMenuItem asChild>
               <Link href="/sign-up">
-                <Sparkles data-icon="inline-start" />
+                <AnimatedIcon name="arrow-up-right" data-icon="inline-start" />
                 Make it yours
               </Link>
             </DropdownMenuItem>
@@ -96,7 +96,7 @@ export function AccountMenu({
             <form action={signOut}>
               <DropdownMenuItem asChild variant="destructive">
                 <button type="submit" className="flex w-full items-center">
-                  <LogOut data-icon="inline-start" />
+                  <AnimatedIcon name="log-out" data-icon="inline-start" />
                   Log out
                 </button>
               </DropdownMenuItem>
