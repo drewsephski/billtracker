@@ -65,7 +65,9 @@ describe("browser session persistence through the real Neon SDK", () => {
     expect(response.headers.getSetCookie().join(";")).toContain(
       `${tokenName}=renewed`,
     );
-    expect(response.headers.getSetCookie().join(";")).toContain("Max-Age=604800");
+    expect(response.headers.getSetCookie().join(";")).toContain(
+      "Max-Age=604800",
+    );
     expect(response.headers.getSetCookie().join(";")).toMatch(/HttpOnly/i);
     expect(response.headers.getSetCookie().join(";")).toMatch(/Secure/);
     expect(response.headers.get("x-middleware-request-cookie")).toContain(

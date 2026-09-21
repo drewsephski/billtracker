@@ -36,6 +36,12 @@ Server Components render the app. Small Client Components handle dialogs, filter
 
 `lib/server/households.ts` provides the authorization boundary: session-derived identity → membership check → role enforcement → scoped transaction. Reads use a repeatable-read snapshot so concurrent mutations cannot combine mismatched bills and splits. React cache is request-local only; private household data is never globally cached.
 
+### Browser sessions
+
+Email sign-in explicitly requests a persistent session. `proxy.ts` checks existing sessions through Neon's auth handler before page rendering and forwards renewed cookies to both the browser and the current request. This is necessary because Server Components cannot write cookies. It bypasses the SDK's session-data cache so upstream session-token renewals are preserved. Signed-in visitors to `/` go straight to `/dashboard`; public pages remain accessible when signed out. Authorization still checks the provider session and household membership on the server.
+
+Neon manages the actual session lifetime and renewal policy. The 60-second `sessionDataTtl` is only an identity-cache duration, not a login timeout. Keep `NEON_AUTH_COOKIE_SECRET` stable across deployments. Clearing browser cookies, provider expiry/revocation, or explicitly signing out still requires another login.
+
 ### Schema
 
 | Table                       | Purpose                                                               |

@@ -19,7 +19,9 @@ test("sign-in persists across a browser reopen and revoked sessions stay signed 
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Create your account" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
-  expect((await first.request.post("/api/auth/sign-out")).ok()).toBe(true);
+  expect(
+    (await first.request.post("/api/auth/sign-out", { data: {} })).ok(),
+  ).toBe(true);
 
   await page.goto("/sign-in");
   await page.getByLabel("Email address").fill(email);
@@ -56,7 +58,9 @@ test("sign-in persists across a browser reopen and revoked sessions stay signed 
     await returning.reload();
     await expect(returning).toHaveURL(/\/onboarding/);
 
-    expect((await reopened.request.post("/api/auth/sign-out")).ok()).toBe(true);
+    expect(
+      (await reopened.request.post("/api/auth/sign-out", { data: {} })).ok(),
+    ).toBe(true);
     // Restoring a saved token must not resurrect the revoked provider session.
     await reopened.addCookies(persistentCookies);
     await returning.goto("/dashboard");
