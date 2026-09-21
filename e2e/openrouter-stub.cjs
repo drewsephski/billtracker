@@ -58,19 +58,14 @@ if (process.env.HOMESHARE_E2E_LLM_STUB === "true") {
     } else {
       intent.intent = "unsupported";
     }
-    return Response.json({
-      id: "stub-completion",
-      object: "chat.completion",
-      created: 1,
-      model: "test-model",
-      choices: [
-        {
-          index: 0,
-          message: { role: "assistant", content: JSON.stringify(intent) },
-          finish_reason: "stop",
-        },
-      ],
-      usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 },
-    });
+    const content = JSON.stringify({ summary: "**Review** the contribution details below. Nothing has been recorded.", activity: intent });
+    const chunks = content.match(/.{1,24}/gs).map((part) => `data: ${JSON.stringify({ id: "stub", choices: [{ index: 0, delta: { content: part }, finish_reason: null }] })}\n\n`);
+    chunks.push(`data: ${JSON.stringify({ id: "stub", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`);
+    return new Response(new ReadableStream({
+      async start(controller) {
+        for (const chunk of chunks) { controller.enqueue(new TextEncoder().encode(chunk)); await new Promise((r) => setTimeout(r, 10)); }
+        controller.close();
+      },
+    }), { headers: { "Content-Type": "text/event-stream" } });
   };
 }

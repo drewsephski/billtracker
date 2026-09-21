@@ -7,6 +7,9 @@ import { useRouter } from "next/navigation";
 import { ArrowUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ActivitySources } from "@/components/activity-sources";
+import type { ActivitySource } from "@/lib/domain/activity-sources";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { Input } from "@/components/ui/input";
 import { Heading, Text } from "@/components/ui/typography";
 import { dateLabel, money } from "@/lib/domain/bills";
@@ -28,6 +31,8 @@ export function ActivityChat({
     () => true,
     () => false,
   );
+  const [sources, setSources] = useState<ActivitySource[]>([]);
+  const [sourceEpoch, setSourceEpoch] = useState(0);
   const [input, setInput] = useState("");
   const [reply, setReply] = useState<ActivityReply>();
   const [confirming, setConfirming] = useState(false);
@@ -78,6 +83,8 @@ export function ActivityChat({
     setMessages([]);
     setNotice("Cancelled. Nothing was recorded.");
     setInput("");
+    setSources([]);
+    setSourceEpoch((value) => value + 1);
   }
   async function send(text: string, choice?: number) {
     if (!text.trim() || pending || confirming) return;
@@ -86,7 +93,7 @@ export function ActivityChat({
     setReply(undefined);
     setInput("");
     composer.current?.blur();
-    await sendMessage({ text }, { body: { token: context, choice } });
+    await sendMessage({ text }, { body: { token: context, choice, sources } });
   }
   async function confirm() {
     if (!reply?.token || inFlight.current) return;
@@ -106,6 +113,8 @@ export function ActivityChat({
         token.current = next.token;
         if (next.kind === "success") {
           setMessages([]);
+          setSources([]);
+          setSourceEpoch((value) => value + 1);
           router.refresh();
         }
       }
@@ -136,20 +145,20 @@ export function ActivityChat({
             “I paid $40 toward internet” · “Allie paid $50 toward electricity”
           </Text>
         )}
-        {messages
-          .filter((m) => m.role === "user")
-          .slice(-2)
-          .map((m) => (
-            <Text
-              key={m.id}
-              small
-              className="break-words rounded-xl bg-muted/60 px-3 py-2"
-            >
-              {m.parts
-                .map((part) => (part.type === "text" ? part.text : ""))
-                .join("")}
-            </Text>
-          ))}
+        <div className="max-h-64 min-w-0 space-y-3 overflow-y-auto overscroll-contain" aria-label="Conversation">
+          {messages.slice(-4).map((m) => {
+            const text = m.parts.filter((part) => part.type === "text").map((part) => part.text).join("");
+            if (!text) return null;
+            return <Message key={m.id} from={m.role}>
+              <MessageContent>
+                {m.role === "assistant" ? <>
+                  <p className="mb-2 text-xs text-muted-foreground">Draft notes · review the details below</p>
+                  <MessageResponse isAnimating={pending && m.id === messages.at(-1)?.id}>{text}</MessageResponse>
+                </> : <p className="whitespace-pre-wrap break-words">{text}</p>}
+              </MessageContent>
+            </Message>;
+          })}
+        </div>
         <div
           ref={result}
           className="min-w-0 scroll-mb-24 space-y-3"
@@ -223,7 +232,7 @@ export function ActivityChat({
               <div className="flex flex-wrap gap-2">
                 <Button
                   className="min-h-11 flex-1"
-                  disabled={confirming}
+                  disabled={confirming || pending}
                   onClick={() => void confirm()}
                 >
                   {confirming ? "Recording…" : "Confirm"}
@@ -282,6 +291,7 @@ export function ActivityChat({
             </Button>
           </form>
         )}
+        {!p && <ActivitySources key={sourceEpoch} householdId={householdId} sources={sources} onChange={setSources} disabled={!hydrated || pending || confirming} />}
         {!p && (pending || messages.length > 0) && (
           <Button
             variant="ghost"

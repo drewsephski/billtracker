@@ -30,24 +30,15 @@ describe("OpenRouter structured-output boundary (stubbed HTTP, real AI SDK)", ()
   });
   function stub(content: string) {
     return vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      Response.json({
-        id: "test",
-        object: "chat.completion",
-        created: 1,
-        model: "test/model",
-        choices: [
-          {
-            index: 0,
-            message: { role: "assistant", content },
-            finish_reason: "stop",
-          },
-        ],
-        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-      }),
+      new Response([
+        `data: ${JSON.stringify({ id: "test", choices: [{ index: 0, delta: { content }, finish_reason: null }] })}\n\n`,
+        `data: ${JSON.stringify({ id: "test", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`,
+        "data: [DONE]\n\n",
+      ].join(""), { headers: { "Content-Type": "text/event-stream" } }),
     );
   }
   it("uses the configured model and current SDK structured output without mutation tools", async () => {
-    const fetch = stub(JSON.stringify(output));
+    const fetch = stub(JSON.stringify({ summary: "**Review** this contribution.", activity: output }));
     expect(await interpretActivity(input)).toEqual(output);
     const body = JSON.parse(fetch.mock.calls[0][1]!.body as string);
     expect(body.model).toBe("test/model");
@@ -56,7 +47,7 @@ describe("OpenRouter structured-output boundary (stubbed HTTP, real AI SDK)", ()
     expect(fetch).toHaveBeenCalledTimes(1);
   });
   it("caps history and removes emails/IDs from user context", async () => {
-    const fetch = stub(JSON.stringify(output));
+    const fetch = stub(JSON.stringify({ summary: "**Review** this contribution.", activity: output }));
     await interpretActivity({
       ...input,
       text: "email me@example.com 12345678-1234-4234-8234-123456789012",
@@ -72,6 +63,7 @@ describe("OpenRouter structured-output boundary (stubbed HTTP, real AI SDK)", ()
       "message",
       "previous",
       "recentUserMessages",
+      "sources",
       "today",
     ]);
   });
@@ -80,7 +72,7 @@ describe("OpenRouter structured-output boundary (stubbed HTTP, real AI SDK)", ()
     JSON.stringify({ ...output, amount: 50 }),
     JSON.stringify({ ...output, memberId: "invented" }),
   ])("rejects invalid model output", async (content) => {
-    stub(content);
+    stub(content.startsWith("{") ? JSON.stringify({ summary: "Draft", activity: JSON.parse(content) }) : content);
     await expect(interpretActivity(input)).rejects.toThrow();
   });
   it("returns a recoverable provider failure without leaking provider details or retrying", async () => {

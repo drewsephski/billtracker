@@ -9,12 +9,14 @@ import { readHousehold } from "@/lib/server/queries";
 import { chooseActivity, prepareActivity } from "@/lib/server/activity";
 import { verifyActivity } from "@/lib/server/activity-token";
 import { interpretActivity } from "@/lib/server/activity-interpreter";
+import { activitySourcesSchema } from "@/lib/domain/activity-sources";
 import { normalizeName } from "@/lib/domain/activity";
 import type { ActivityMessage } from "@/lib/domain/activity-chat";
 export const runtime = "nodejs";
 export const maxDuration = 40;
 const requestSchema = z.object({
   householdId: z.uuid(),
+  sources: activitySourcesSchema.optional(),
   token: z.string().max(32_000).optional(),
   choice: z.number().int().min(0).max(1000).optional(),
   messages: z
@@ -45,6 +47,10 @@ export async function POST(request: Request) {
     const stream = createUIMessageStream<ActivityMessage>({
       execute: async ({ writer }) => {
         writer.write({ type: "start" });
+        let textStarted = false;
+        const finishText = () => {
+          if (textStarted) { writer.write({ type: "text-end", id: "summary" }); textStarted = false; }
+        };
         try {
           let reply;
           if (body.choice !== undefined && body.token)
@@ -57,6 +63,12 @@ export async function POST(request: Request) {
               householdName: data.household.name,
               today: data.today,
               signal: request.signal,
+              sources: body.sources,
+              onSummary: (delta) => {
+                if (!delta) return;
+                if (!textStarted) { writer.write({ type: "text-start", id: "summary" }); textStarted = true; }
+                writer.write({ type: "text-delta", id: "summary", delta });
+              },
             });
             // Keep a clicked disambiguation only while its spoken reference is unchanged.
             const selection = prior
@@ -81,8 +93,10 @@ export async function POST(request: Request) {
               selection,
             );
           }
+          finishText();
           writer.write({ type: "data-activity", data: reply });
         } catch (error) {
+          finishText();
           writer.write({
             type: "data-activity",
             data: { kind: "error", message: activityError(error) },
