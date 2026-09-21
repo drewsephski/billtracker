@@ -37,7 +37,7 @@ export function ActivityPromptChoices({
           className={
             compact
               ? "h-auto min-h-8 max-w-full justify-start rounded-lg bg-muted/30 px-2.5 py-1.5 text-left text-xs leading-snug whitespace-normal pointer-coarse:min-h-11"
-              : "group h-auto min-h-11 min-w-0 items-start justify-start whitespace-normal rounded-xl bg-background/40 p-3 text-left"
+              : "group h-full min-h-32 min-w-0 items-start justify-start whitespace-normal rounded-xl bg-background/40 p-3 text-left"
           }
         >
           <span className="min-w-0 flex-1">

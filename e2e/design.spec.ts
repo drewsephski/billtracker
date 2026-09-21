@@ -1,6 +1,6 @@
 import { test, expect, type Locator } from "@playwright/test";
 
-test("public chat previews stay read-only and link to the demo group chat", async ({
+test("public activity previews explain the review flow and link to the demo group chat", async ({
   page,
 }) => {
   const requests: string[] = [];
@@ -12,20 +12,30 @@ test("public chat previews stay read-only and link to the demo group chat", asyn
   });
   for (const path of ["/", "/demo", "/demo/dashboard"]) {
     await page.goto(path);
+    if (path === "/") {
+      await expect(
+        page.getByRole("link", { name: "Join an existing home" }),
+      ).toHaveAttribute("href", "/join");
+    }
     await expect(
-      page.getByRole("heading", { name: "Tell Homeshare what happened" }),
+      page.getByRole("heading", { name: "See how Homeshare sorts it out" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: /^Record a contribution/ }).click();
+    await page.getByRole("button", { name: /^Record my contribution/ }).click();
     await expect(
       page.getByRole("textbox", { name: "Describe bill activity" }),
-    ).toHaveValue("I paid $25 toward Internet.");
+    ).toHaveValue("I paid $25 toward Internet this month. Done now!");
     await page
       .getByRole("button", { name: "Send activity", exact: true })
       .click();
-    await expect(page.getByRole("status")).toContainText("read-only demo");
+    await expect(page.getByTestId("activity-proposal")).toBeVisible();
+    await expect(page.getByText("Current share: $25.00")).toBeVisible();
     await expect(
-      page.getByRole("textbox", { name: "Describe bill activity" }),
-    ).toHaveValue("I paid $25 toward Internet.");
+      page.getByRole("link", { name: "Create my household" }),
+    ).toHaveAttribute("href", "/sign-up");
+    await page.getByRole("button", { name: "Try another request" }).click();
+    await expect(
+      page.getByRole("button", { name: /^Record my contribution/ }),
+    ).toBeVisible();
     const link = page.getByRole("link", {
       name: "Open group chat",
       exact: true,
@@ -63,6 +73,20 @@ test("public chat previews stay read-only and link to the demo group chat", asyn
   }
   expect(requests).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+test("landing invitation entry opens the public join form", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Join an existing home" }).click();
+  await expect(page).toHaveURL(/\/join$/);
+  await expect(
+    page.getByRole("textbox", { name: "Invite code or link" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue to invitation" }),
+  ).toBeVisible();
 });
 
 test("bill date picker fits mobile and preserves calendar dates across time zones", async ({

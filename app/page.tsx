@@ -63,6 +63,22 @@ export default function Home() {
                 <Link href="/demo">Take a look around</Link>
               </Button>
             </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Text small muted>
+                Have an invite code or link?
+              </Text>
+              <Button
+                variant="link"
+                size="sm"
+                asChild
+                className="h-auto px-0 py-0"
+              >
+                <Link href="/join">
+                  Join an existing home
+                  <AnimatedIcon name="arrow-right" data-icon="inline-end" />
+                </Link>
+              </Button>
+            </div>
             <Text small muted className="flex items-center gap-2">
               <Check className="size-4" />
               Simple to start. Made for real roommates.

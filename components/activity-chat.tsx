@@ -6,6 +6,7 @@ import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, Loader2, Paperclip, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ActivitySources } from "@/components/activity-sources";
 import type { ActivitySource } from "@/lib/domain/activity-sources";
@@ -27,6 +28,11 @@ import { Heading, Text } from "@/components/ui/typography";
 import { dateLabel, money } from "@/lib/domain/bills";
 import type { ActivityReply } from "@/lib/domain/activity";
 import type { ActivityMessage } from "@/lib/domain/activity-chat";
+import {
+  demoActivityPrompts,
+  demoActivityReply,
+  type DemoActivityKey,
+} from "@/lib/demo-activity";
 
 const subscribeToHydration = () => () => {};
 
@@ -55,6 +61,7 @@ export function ActivityChat({
   const [reply, setReply] = useState<ActivityReply>();
   const [confirming, setConfirming] = useState(false);
   const [notice, setNotice] = useState("");
+  const [demoKey, setDemoKey] = useState<DemoActivityKey>();
   const token = useRef<string | undefined>(undefined);
   const inFlight = useRef(false);
   const composer = useRef<HTMLTextAreaElement>(null);
@@ -97,6 +104,20 @@ export function ActivityChat({
   function pick(prompt: ActivityPrompt) {
     setInput(prompt.text);
     setSelectedChoice(prompt.choice !== undefined ? prompt : undefined);
+    if (demo) {
+      const nextKey = demoActivityPrompts.find(
+        (candidate) => candidate.label === prompt.label,
+      );
+      setDemoKey(
+        nextKey
+          ? nextKey.label === "Record my contribution"
+            ? "own-share"
+            : nextKey.label === "Set up a shared bill"
+              ? "new-bill"
+              : "roommate-share"
+          : undefined,
+      );
+    }
     setNotice("");
     if (reply?.kind === "success") setReply(undefined);
     if (prompt.text.startsWith("Use the attached")) setReferencesOpen(true);
@@ -123,13 +144,49 @@ export function ActivityChat({
     setSources([]);
     setSourceEpoch((value) => value + 1);
   }
+  function resetDemo() {
+    setMessages([]);
+    setReply(undefined);
+    setInput("");
+    setDemoKey(undefined);
+    setNotice("");
+  }
+  function inferDemoKey(text: string): DemoActivityKey | undefined {
+    const normalized = text.toLocaleLowerCase();
+    if (normalized.includes("emma") && normalized.includes("gas"))
+      return "roommate-share";
+    if (normalized.includes("internet")) return "own-share";
+    if (normalized.includes("bill")) return "new-bill";
+    return undefined;
+  }
   async function send(text: string, choice?: number) {
     if (!text.trim() || pending || confirming || promptPlaceholder.test(text))
       return;
     if (demo) {
-      setNotice(
-        "This is a read-only demo. Sign up to record activity in your own home.",
-      );
+      const key = demoKey ?? inferDemoKey(text);
+      if (!key) {
+        setNotice("Pick a sample request to preview Homeshare’s review flow.");
+        return;
+      }
+      const preview = demoActivityReply(key, today);
+      const stamp = Date.now();
+      const previewMessages: ActivityMessage[] = [
+        {
+          id: `demo-activity-user-${stamp}`,
+          role: "user",
+          parts: [{ type: "text", text }],
+        },
+        {
+          id: `demo-activity-assistant-${stamp}`,
+          role: "assistant",
+          parts: [{ type: "text", text: preview.message }],
+        },
+      ];
+      setMessages(previewMessages);
+      setReply(preview);
+      setInput("");
+      setDemoKey(undefined);
+      setNotice("");
       return;
     }
     choice ??=
@@ -180,32 +237,25 @@ export function ActivityChat({
     <Card className="min-w-0" aria-label="Household activity chat">
       <CardContent className="space-y-4 p-5 sm:p-6">
         <div className="space-y-1">
-          <Heading level={2} className="text-lg">
-            Tell Homeshare what happened
-          </Heading>
+          <div className="flex flex-wrap items-center gap-2">
+            <Heading level={2} className="text-lg">
+              {demo
+                ? "See how Homeshare sorts it out"
+                : "Tell Homeshare what happened"}
+            </Heading>
+            {demo && <Badge variant="outline">Interactive preview</Badge>}
+          </div>
           <Text small muted>
-            Record a roommate’s share in {householdName}. You’ll review it
-            first.
+            {demo
+              ? "Pick a real household request. Homeshare checks the bill, calculates the share, and shows you what would be recorded."
+              : `Record a roommate’s share in ${householdName}. You’ll review it first.`}
           </Text>
         </div>
         {!messages.length &&
           (!reply || reply.kind === "success") &&
           (demo ? (
             <ActivityPromptChoices
-              prompts={[
-                {
-                  label: "Record a contribution",
-                  text: "I paid $25 toward Internet.",
-                },
-                {
-                  label: "Add a shared bill",
-                  text: "Add a $30 household supplies bill due today, split equally. I paid my $10 share.",
-                },
-                {
-                  label: "Record a roommate’s share",
-                  text: "Emma paid $30.80 toward Gas.",
-                },
-              ]}
+              prompts={[...demoActivityPrompts]}
               disabled={!hydrated}
               onPick={pick}
             />
@@ -287,10 +337,34 @@ export function ActivityChat({
           {p && (
             <ActivityConfirmation
               p={p}
-              disabled={confirming || pending}
-              onConfirm={() => void confirm()}
-              onCancel={cancel}
+              disabled={confirming || pending || demo}
+              onConfirm={demo ? undefined : () => void confirm()}
+              onCancel={demo ? resetDemo : cancel}
             />
+          )}
+          {demo && p && (
+            <div className="space-y-2 rounded-xl bg-secondary/55 p-4">
+              <Text small className="font-medium">
+                Ready to make this real?
+              </Text>
+              <Text small muted>
+                This preview uses the same review step, equal-split math, and
+                share checks as a real household.
+              </Text>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button asChild className="min-h-11">
+                  <Link href="/sign-up">Create my household</Link>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={resetDemo}
+                >
+                  Try another request
+                </Button>
+              </div>
+            </div>
           )}
           {reply?.billUrl && (
             <Button asChild variant="outline" className="min-h-11">
@@ -348,7 +422,7 @@ export function ActivityChat({
         )}
         {demo && (
           <Text small muted>
-            Explore a read-only demo.{" "}
+            Preview only — nothing is saved.{" "}
             <Link
               href="/sign-up"
               className="font-medium text-primary underline underline-offset-4"

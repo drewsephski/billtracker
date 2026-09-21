@@ -8,7 +8,7 @@ export function HouseholdActivity({
   data,
   demo = false,
 }: {
-  data: Pick<HouseholdData, "household" | "today">;
+  data: HouseholdData;
   demo?: boolean;
 }) {
   return (

@@ -17,21 +17,27 @@ export function JoinLinkForm() {
           new FormData(event.currentTarget).get("invitation") || "",
         ).trim();
         try {
-          const url = new URL(value, window.location.origin);
-          if (!/^\/join\/[a-f0-9]{64}$/.test(url.pathname)) throw new Error();
-          router.push(url.pathname);
+          const token = /^[a-f0-9]{64}$/.test(value)
+            ? value
+            : new URL(value, window.location.origin).pathname.match(
+                /^\/join\/([a-f0-9]{64})$/,
+              )?.[1];
+          if (!token) throw new Error();
+          router.push(`/join/${token}`);
         } catch {
-          setError("Paste the full invitation link your roommate shared.");
+          setError(
+            "Enter the invite code or paste the link your roommate shared.",
+          );
         }
       }}
     >
       <Field>
-        <FieldLabel htmlFor="invitation">Invitation link</FieldLabel>
+        <FieldLabel htmlFor="invitation">Invite code or link</FieldLabel>
         <Input
           id="invitation"
           name="invitation"
           required
-          placeholder="Paste your invitation link"
+          placeholder="Paste a link or enter the code"
         />
         <FieldDescription>
           No need to create a household. Join the one your roommate already set
@@ -40,7 +46,7 @@ export function JoinLinkForm() {
       </Field>
       <Feedback state={{ error }} />
       <Button type="submit" variant="outline" className="w-full">
-        Open invitation
+        Continue to invitation
       </Button>
     </form>
   );
