@@ -1,4 +1,4 @@
-import { canManageShare } from "./bills";
+import { canManageShare, dateLabel } from "./bills";
 import type { HouseholdData } from "./types";
 
 export type ActivityPrompt = { label: string; text: string; choice?: number };
@@ -7,7 +7,7 @@ export type ActivityGuidance = {
   prompts: ActivityPrompt[];
 };
 export const promptPlaceholder =
-  /\[(?:contribution|total|YYYY-MM-DD|amount|bill|name)\]/;
+  /\[(?:contribution|total|due date|YYYY-MM-DD|amount|bill|name)\]/;
 export const draftDollars = (cents: number) =>
   `$${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
 export type PromptCandidate = {
@@ -89,12 +89,41 @@ export function renderActivityPrompt(
   const bill =
     candidate.kind === "new"
       ? `a new ${candidate.bill} bill`
-      : `${candidate.bill}, due ${candidate.dueDate}`;
+      : `${candidate.bill}, due ${candidate.dueDate ? dateLabel(candidate.dueDate, true) : "[due date]"}`;
   return {
     label:
       candidate.kind === "new"
         ? `Set up ${candidate.bill}`
         : `${candidate.payer === "I" ? "My" : `${candidate.payer}’s`} ${candidate.bill} share`,
-    text: `${candidate.payer} ${verb} ${amount} toward ${share} share of ${bill}.${candidate.kind === "new" ? " The total is $[total], due [YYYY-MM-DD]." : ""}`,
+    text: `${candidate.payer} ${verb} ${amount} toward ${share} share of ${bill}.${candidate.kind === "new" ? " The total is $[total], due [due date]." : ""}`,
   };
+}
+
+export const placeholderLabels: Record<string, string> = {
+  "[contribution]": "Contribution",
+  "[amount]": "Amount",
+  "[total]": "Bill total",
+  "[due date]": "Due date",
+  "[YYYY-MM-DD]": "Due date",
+  "[bill]": "Bill name",
+  "[name]": "Roommate",
+};
+export function draftPlaceholders(text: string) {
+  return [...text.matchAll(new RegExp(promptPlaceholder.source, "g"))].map(
+    (match) => ({
+      token: match[0],
+      start: match.index,
+      end: match.index + match[0].length,
+    }),
+  );
+}
+// A stale field editor must never replace text the user has since changed.
+export function replaceDraftPlaceholder(
+  text: string,
+  start: number,
+  token: string,
+  value: string,
+) {
+  if (text.slice(start, start + token.length) !== token) return text;
+  return text.slice(0, start) + value + text.slice(start + token.length);
 }

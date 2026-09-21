@@ -14,7 +14,7 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
-import { Textarea } from "@/components/ui/textarea";
+import { ActivityDraft } from "@/components/activity-draft";
 import {
   ActivityStarters,
   ActivityPromptChoices,
@@ -33,9 +33,11 @@ const subscribeToHydration = () => () => {};
 export function ActivityChat({
   householdId,
   householdName,
+  today,
 }: {
   householdId: string;
   householdName: string;
+  today: string;
 }) {
   const router = useRouter();
   const hydrated = useSyncExternalStore(
@@ -202,7 +204,7 @@ export function ActivityChat({
                   {m.role === "assistant" ? (
                     <>
                       <p className="mb-2 text-xs text-muted-foreground">
-                        From your sources · review before confirming
+                        Source summary
                       </p>
                       <MessageResponse
                         isAnimating={pending && m.id === messages.at(-1)?.id}
@@ -225,9 +227,9 @@ export function ActivityChat({
           aria-atomic="true"
         >
           {pending && (
-            <Text small muted className="flex items-end gap-2">
+            <Text small muted className="flex items-start gap-2">
               <Loader2 className="size-4 motion-safe:animate-spin" />
-              Preparing the details…
+              Checking your activity…
             </Text>
           )}
           {reply && (
@@ -324,15 +326,15 @@ export function ActivityChat({
         </div>
         {!p && (
           <form
-            className="flex items-end gap-2"
+            className="flex items-start gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               void send(input);
             }}
           >
-            <Textarea
-              ref={composer}
-              aria-label="Describe bill activity"
+            <ActivityDraft
+              textareaRef={composer}
+              today={today}
               placeholder={
                 reply?.guidance?.placeholder ??
                 (reply?.choices
@@ -340,26 +342,12 @@ export function ActivityChat({
                   : "Tell me what happened…")
               }
               value={input}
-              maxLength={1000}
-              onChange={(e) => {
-                setInput(e.target.value);
+              onChange={(value) => {
+                setInput(value);
                 setSelectedChoice(undefined);
               }}
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing
-                ) {
-                  e.preventDefault();
-                  void send(input);
-                }
-              }}
-              rows={2}
+              onSend={() => void send(input)}
               disabled={!hydrated || pending || confirming}
-              enterKeyHint="send"
-              autoComplete="off"
-              className="max-h-40 min-h-16 min-w-0 resize-none text-base md:text-base"
             />
             <Button
               type="submit"
@@ -377,11 +365,6 @@ export function ActivityChat({
               <ArrowUp />
             </Button>
           </form>
-        )}
-        {!p && promptPlaceholder.test(input) && (
-          <Text small muted role="status">
-            Replace the bracketed details with the actual amounts and date.
-          </Text>
         )}
         {!p && (
           <div className="space-y-2">

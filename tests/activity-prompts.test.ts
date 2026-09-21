@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
+import { dateLabel } from "@/lib/domain/bills";
 import { randomUUID } from "node:crypto";
 import { demoData } from "@/lib/demo";
 import {
@@ -6,6 +7,8 @@ import {
   renderActivityPrompt,
   promptPlaceholder,
   draftDollars,
+  draftPlaceholders,
+  replaceDraftPlaceholder,
 } from "@/lib/domain/activity-prompts";
 import { activitySuggestions } from "@/lib/server/activity-suggestions";
 import { resolveActivity, type ActivityIntent } from "@/lib/domain/activity";
@@ -40,7 +43,7 @@ describe("household-aware prompt drafts", () => {
     ).toBe(true);
     for (const candidate of candidates.filter((c) => c.kind === "existing")) {
       const prompt = renderActivityPrompt(candidate, "paid");
-      expect(prompt.text).toContain(candidate.dueDate);
+      expect(prompt.text).toContain(dateLabel(candidate.dueDate!, true));
       expect(prompt.text).toContain(candidate.amount);
     }
     for (const bill of data.bills) bill.paidCents = bill.amountCents;
@@ -58,7 +61,7 @@ describe("household-aware prompt drafts", () => {
     expect(new Set(drafts.map((d) => d.text)).size).toBe(3);
     for (const draft of drafts)
       expect(promptPlaceholder.test(draft.text)).toBe(true);
-    expect(drafts[0].text).toContain("$[total], due [YYYY-MM-DD]");
+    expect(drafts[0].text).toContain("$[total], due [due date]");
   });
   it("guides new-bill details without guessing a total or date", () => {
     const data = demoData();
@@ -67,12 +70,12 @@ describe("household-aware prompt drafts", () => {
     expect(result.kind).toBe("clarification");
     if (result.kind !== "clarification") return;
     expect(result.guidance?.prompts[0].text).toBe(
-      "The total is $[total], due [YYYY-MM-DD].",
+      "The total is $[total], due [due date].",
     );
     const dateOnly = resolveActivity({ ...base, total: "90" }, data);
     if (dateOnly.kind === "clarification")
       expect(dateOnly.guidance?.prompts[0].text).toBe(
-        "The due date is [YYYY-MM-DD].",
+        "The due date is [due date].",
       );
   });
   it("uses Luna's structured choices, excludes identity metadata, and coalesces identical requests", async () => {
@@ -128,5 +131,26 @@ describe("household-aware prompt drafts", () => {
     const result = await activitySuggestions(data);
     expect(result).toHaveLength(3);
     expect(result.every((p) => p.text.includes("[total]"))).toBe(true);
+  });
+});
+
+describe("editable prompt placeholders", () => {
+  it("replaces whole fields, preserves currency and surrounding text", () => {
+    const text = "The total is $[total], due [due date].";
+    const [total, date] = draftPlaceholders(text);
+    expect(text.slice(total.start, total.end)).toBe("[total]");
+    expect(
+      replaceDraftPlaceholder(text, total.start, total.token, "90.00"),
+    ).toBe("The total is $90.00, due [due date].");
+    expect(
+      replaceDraftPlaceholder(text, date.start, date.token, "Sep 28, 2027"),
+    ).toBe("The total is $[total], due Sep 28, 2027.");
+    expect(draftPlaceholders("Due [YYYY-MM-DD]")).toHaveLength(1);
+  });
+  it("does not overwrite manually changed text or treat unrelated brackets as fields", () => {
+    expect(
+      replaceDraftPlaceholder("The total is $95.", 14, "[total]", "90"),
+    ).toBe("The total is $95.");
+    expect(draftPlaceholders("Read [Source 1] and [notes]")).toEqual([]);
   });
 });

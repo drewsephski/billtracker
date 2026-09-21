@@ -27,16 +27,27 @@ export function DatePicker({
   name,
   defaultValue,
   today,
+  value: controlledValue,
+  onValueChange,
+  disabled = false,
+  placeholder = "Choose due date",
+  className,
 }: {
   id: string;
   name: string;
   defaultValue: string;
   today: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string;
 }) {
-  const [value, setValue] = useState(defaultValue);
+  const [localValue, setValue] = useState(defaultValue);
+  const value = controlledValue ?? localValue;
   const [open, setOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const selected = calendarDate(value);
+  const selected = value ? calendarDate(value) : undefined;
   return (
     <>
       <input type="hidden" name={name} value={value} />
@@ -46,11 +57,17 @@ export function DatePicker({
             id={id}
             type="button"
             variant="outline"
-            aria-description={dateLabel(value, true)}
-            title={dateLabel(value, true)}
-            className="h-11 w-full min-w-0 justify-between gap-2 rounded-[0.8rem] bg-transparent px-3 text-sm font-normal"
+            disabled={disabled}
+            aria-description={value ? dateLabel(value, true) : undefined}
+            title={value ? dateLabel(value, true) : placeholder}
+            className={
+              className ??
+              "h-11 w-full min-w-0 justify-between gap-2 rounded-[0.8rem] bg-transparent px-3 text-sm font-normal"
+            }
           >
-            <span className="truncate">{dateLabel(value)}</span>
+            <span className="truncate">
+              {value ? dateLabel(value, true) : placeholder}
+            </span>
             <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
           </Button>
         </PopoverTrigger>
@@ -74,10 +91,11 @@ export function DatePicker({
             mode="single"
             required
             selected={selected}
-            defaultMonth={selected}
+            defaultMonth={selected ?? calendarDate(today)}
             today={calendarDate(today)}
             onSelect={(date) => {
               setValue(dateValue(date));
+              onValueChange?.(dateValue(date));
               setOpen(false);
             }}
             startMonth={calendarDate("2000-01-01")}

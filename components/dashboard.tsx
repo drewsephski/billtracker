@@ -101,6 +101,7 @@ export function Dashboard({
           key={household.id}
           householdId={household.id}
           householdName={household.name}
+          today={today}
         />
       )}
       <section aria-label="Household this month" className="space-y-3 px-1">

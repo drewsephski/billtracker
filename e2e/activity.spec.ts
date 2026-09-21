@@ -210,15 +210,59 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
       fullPage: true,
     });
     await page
-      .getByRole("button", { name: "Enter total & due date", exact: true })
+      .getByRole("button", { name: "Add total & date", exact: true })
       .click();
     await expect(page.getByLabel("Describe bill activity")).toHaveValue(
-      "The total is $[total], due [YYYY-MM-DD].",
+      "The total is $[total], due [due date].",
     );
     await expect(
       page.getByRole("button", { name: "Send activity" }),
     ).toBeDisabled();
-    await submit("The total is $90, due 2027-09-28");
+    const details = page.getByLabel("Fill in draft details");
+    await expect(
+      page.locator("mark").filter({ hasText: "[total]" }),
+    ).toBeVisible();
+    await details
+      .getByRole("button", { name: "Bill total", exact: true })
+      .click();
+    await page.getByLabel("Bill total", { exact: true }).fill("0");
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("positive amount");
+    await page.getByLabel("Bill total", { exact: true }).fill("90");
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
+      "The total is $90, due [due date].",
+    );
+    await details
+      .getByRole("button", { name: "Choose due date", exact: true })
+      .click();
+    const calendar = page.getByLabel("Choose due date", { exact: true });
+    // No date is silently selected; the calendar starts at the household's today.
+    const householdToday = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Chicago",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const [year, month] = householdToday.split("-");
+    await expect(calendar.getByRole("combobox", { name: /year/i })).toHaveValue(
+      year,
+    );
+    await expect(
+      calendar.getByRole("combobox", { name: /month/i }),
+    ).toHaveValue(String(Number(month) - 1));
+    await calendar
+      .getByRole("combobox", { name: /year/i })
+      .selectOption("2027");
+    await calendar.getByRole("combobox", { name: /month/i }).selectOption("8");
+    await calendar
+      .getByRole("button", { name: /September 28th, 2027/ })
+      .click();
+    await expect(page.getByLabel("Describe bill activity")).toHaveValue(
+      "The total is $90, due Sep 28, 2027.",
+    );
+    await expect(details).toHaveCount(0);
+    await page.getByRole("button", { name: "Send activity" }).click();
     await expect(proposal).toContainText("Create Water");
     await expect(proposal).toContainText("Allie Jones");
     // Lose the response AFTER the transaction commits, then retry the same token.

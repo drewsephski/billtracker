@@ -56,6 +56,18 @@ describe.skipIf(!enabled)("live OpenRouter task evaluation", () => {
         amount: "50.01",
       },
       { text: "I paid ComEd $180", intent: "provider_payment" },
+      {
+        text: "I paid $10 toward my share of water. The total is $90, due Sep 28, 2027.",
+        intent: "contribution",
+        amount: "10",
+        dueDate: "2027-09-28",
+      },
+      {
+        text: "I paid $10 toward my share of water. The total is $90, due tomorrow.",
+        intent: "contribution",
+        amount: "10",
+        dueDate: "2026-09-22",
+      },
       { text: "Allie paid $50 electric and $20 internet", intent: "multiple" },
       {
         text: "I paid $1.234 toward my share of internet",
@@ -101,6 +113,7 @@ describe.skipIf(!enabled)("live OpenRouter task evaluation", () => {
         );
         expect(result.intent).toBe(fixture.intent);
         if (fixture.amount) expect(result.amount).toBe(fixture.amount);
+        if (fixture.dueDate) expect(result.dueDate).toBe(fixture.dueDate);
         if (fixture.source) {
           expect(result.total).toBe("90.00");
           expect(result.dueDate).toBe("2026-10-28");

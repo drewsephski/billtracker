@@ -84,7 +84,9 @@ if (process.env.HOMESHARE_E2E_LLM_STUB === "true") {
         prompt.sources[0].text.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
     } else if (/total is/i.test(text)) {
       intent.total = text.match(/\$(\d+(?:\.\d+)?)/)?.[1] ?? null;
-      intent.dueDate = text.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+      intent.dueDate =
+        text.match(/\d{4}-\d{2}-\d{2}/)?.[0] ??
+        (/Sep 28, 2027/.test(text) ? "2027-09-28" : null);
     } else {
       intent.intent = "unsupported";
     }

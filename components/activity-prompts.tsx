@@ -19,7 +19,9 @@ export function ActivityPromptChoices({
   return (
     <div
       className={
-        compact ? "flex flex-wrap gap-2" : "grid min-w-0 gap-2 sm:grid-cols-3"
+        compact
+          ? "flex flex-wrap items-center gap-1.5"
+          : "grid min-w-0 gap-2 sm:grid-cols-3"
       }
       aria-label={
         compact ? "Suggested next steps" : "Household prompt suggestions"
@@ -34,12 +36,20 @@ export function ActivityPromptChoices({
           onClick={() => onPick(prompt)}
           className={
             compact
-              ? "h-auto min-h-11 max-w-full whitespace-normal px-3 py-2 text-left text-xs"
+              ? "h-auto min-h-8 max-w-full justify-start rounded-lg bg-muted/30 px-2.5 py-1.5 text-left text-xs leading-snug whitespace-normal pointer-coarse:min-h-11"
               : "group h-auto min-h-11 min-w-0 items-start justify-start whitespace-normal rounded-xl bg-background/40 p-3 text-left"
           }
         >
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-medium">{prompt.label}</span>
+            <span
+              className={
+                compact
+                  ? "block text-xs font-medium"
+                  : "block text-sm font-medium"
+              }
+            >
+              {prompt.label}
+            </span>
             {!compact && (
               <span className="mt-1 block break-words text-xs font-normal leading-relaxed text-muted-foreground">
                 {prompt.text}

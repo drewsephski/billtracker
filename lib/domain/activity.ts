@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   categories,
+  dateLabel,
   canManageShare,
   equalSplit,
   money,
@@ -193,13 +194,15 @@ export function resolveActivity(
       prompts: data.bills
         .filter((b) =>
           b.splits.some((s) =>
-            canManageShare(data.viewer.role, data.viewer.id, s.memberId),
+            s.paidCents < s.amountCents &&
+            canManageShare(data.viewer.role, data.viewer.id, s.memberId) &&
+            memberCandidates(intent.payer!, data.members, data.viewer.id).some((m) => m.id === s.memberId),
           ),
         )
         .slice(0, 3)
         .map((b) => ({
-          label: `${b.name} · ${b.dueDate}`,
-          text: `It’s for ${b.name}, due ${b.dueDate}.`,
+          label: `${b.name} · ${dateLabel(b.dueDate, true)}`,
+          text: `It’s for ${b.name}, due ${dateLabel(b.dueDate, true)}.`,
         })),
     });
   if (intent.incomplete)
@@ -231,7 +234,7 @@ export function resolveActivity(
       {
         placeholder: "Due date, including the year…",
         prompts: [
-          { label: "Enter due date", text: "The due date is [YYYY-MM-DD]." },
+          { label: "Choose due date", text: "The due date is [due date]." },
         ],
       },
     );
@@ -308,7 +311,7 @@ export function resolveActivity(
       kind: "clarification",
       message: "Which bill did you mean?",
       choices: candidates.map((b, i) => ({
-        label: `${b.name} · ${money(b.amountCents)} · due ${b.dueDate}${candidates.filter((c) => c.name === b.name && c.dueDate === b.dueDate && c.amountCents === b.amountCents).length > 1 ? ` (bill ${i + 1})` : ""}`,
+        label: `${b.name} · ${money(b.amountCents)} · due ${dateLabel(b.dueDate, true)}${candidates.filter((c) => c.name === b.name && c.dueDate === b.dueDate && c.amountCents === b.amountCents).length > 1 ? ` (bill ${i + 1})` : ""}`,
         selection: { memberId: payer.id, billId: b.id },
       })),
     };
@@ -381,29 +384,21 @@ export function resolveActivity(
           {
             label:
               !totalCents && !intent.dueDate
-                ? "Enter total & due date"
+                ? "Add total & date"
                 : !totalCents
-                  ? "Enter bill total"
-                  : "Enter due date",
+                  ? "Add bill total"
+                  : "Choose due date",
             text:
               !totalCents && !intent.dueDate
-                ? "The total is $[total], due [YYYY-MM-DD]."
+                ? "The total is $[total], due [due date]."
                 : !totalCents
                   ? "The total bill amount is $[total]."
-                  : "The due date is [YYYY-MM-DD].",
+                  : "The due date is [due date].",
           },
           {
-            label: "Use an attached bill",
+            label: "Read my bill",
             text: "Use the attached bill’s total and due date for this contribution.",
           },
-          ...(!totalCents && !intent.dueDate
-            ? [
-                {
-                  label: "Start with the total",
-                  text: "The total bill amount is $[total].",
-                },
-              ]
-            : []),
         ],
       },
     );
