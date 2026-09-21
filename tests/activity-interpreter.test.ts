@@ -29,16 +29,26 @@ describe("OpenRouter structured-output boundary (stubbed HTTP, real AI SDK)", ()
     vi.unstubAllEnvs();
   });
   function stub(content: string) {
-    return vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response([
-        `data: ${JSON.stringify({ id: "test", choices: [{ index: 0, delta: { content }, finish_reason: null }] })}\n\n`,
-        `data: ${JSON.stringify({ id: "test", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`,
-        "data: [DONE]\n\n",
-      ].join(""), { headers: { "Content-Type": "text/event-stream" } }),
-    );
+    return vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(
+          [
+            `data: ${JSON.stringify({ id: "test", choices: [{ index: 0, delta: { content }, finish_reason: null }] })}\n\n`,
+            `data: ${JSON.stringify({ id: "test", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`,
+            "data: [DONE]\n\n",
+          ].join(""),
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+      );
   }
   it("uses the configured model and current SDK structured output without mutation tools", async () => {
-    const fetch = stub(JSON.stringify({ summary: "**Review** this contribution.", activity: output }));
+    const fetch = stub(
+      JSON.stringify({
+        summary: "**Review** this contribution.",
+        activity: output,
+      }),
+    );
     expect(await interpretActivity(input)).toEqual(output);
     const body = JSON.parse(fetch.mock.calls[0][1]!.body as string);
     expect(body.model).toBe("test/model");
@@ -46,8 +56,38 @@ describe("OpenRouter structured-output boundary (stubbed HTTP, real AI SDK)", ()
     expect(body.response_format.type).toBe("json_schema");
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+  it("streams draft Markdown and passes only bounded, redacted references", async () => {
+    const fetch = stub(
+      JSON.stringify({
+        summary: "**Water**\n\n- Total: $90 [Source 1]",
+        activity: output,
+      }),
+    );
+    const onSummary = vi.fn();
+    await interpretActivity({
+      ...input,
+      onSummary,
+      sources: [{ name: "Bill", text: "Water $90 me@example.com" }],
+    });
+    expect(onSummary.mock.calls.map(([delta]) => delta).join("")).toContain(
+      "**Water**",
+    );
+    const body = JSON.parse(fetch.mock.calls[0][1]!.body as string);
+    expect(body.stream).toBe(true);
+    expect(body.reasoning.exclude).toBe(true);
+    expect(body.provider.require_parameters).toBe(true);
+    expect(body.provider.data_collection).toBe("deny");
+    expect(
+      JSON.parse(body.messages.at(-1).content).sources[0].text,
+    ).not.toContain("me@example.com");
+  });
   it("caps history and removes emails/IDs from user context", async () => {
-    const fetch = stub(JSON.stringify({ summary: "**Review** this contribution.", activity: output }));
+    const fetch = stub(
+      JSON.stringify({
+        summary: "**Review** this contribution.",
+        activity: output,
+      }),
+    );
     await interpretActivity({
       ...input,
       text: "email me@example.com 12345678-1234-4234-8234-123456789012",
@@ -72,7 +112,11 @@ describe("OpenRouter structured-output boundary (stubbed HTTP, real AI SDK)", ()
     JSON.stringify({ ...output, amount: 50 }),
     JSON.stringify({ ...output, memberId: "invented" }),
   ])("rejects invalid model output", async (content) => {
-    stub(content.startsWith("{") ? JSON.stringify({ summary: "Draft", activity: JSON.parse(content) }) : content);
+    stub(
+      content.startsWith("{")
+        ? JSON.stringify({ summary: "Draft", activity: JSON.parse(content) })
+        : content,
+    );
     await expect(interpretActivity(input)).rejects.toThrow();
   });
   it("returns a recoverable provider failure without leaking provider details or retrying", async () => {

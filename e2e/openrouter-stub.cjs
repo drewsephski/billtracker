@@ -52,20 +52,42 @@ if (process.env.HOMESHARE_E2E_LLM_STUB === "true") {
         total: null,
         dueDate: null,
       });
+    } else if (/attached bill/i.test(text) && prompt.sources?.length) {
+      intent.total =
+        prompt.sources[0].text.match(/\$(\d+(?:\.\d+)?)/)?.[1] ?? null;
+      intent.dueDate =
+        prompt.sources[0].text.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
     } else if (/total is/i.test(text)) {
       intent.total = text.match(/\$(\d+(?:\.\d+)?)/)?.[1] ?? null;
       intent.dueDate = text.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
     } else {
       intent.intent = "unsupported";
     }
-    const content = JSON.stringify({ summary: "**Review** the contribution details below. Nothing has been recorded.", activity: intent });
-    const chunks = content.match(/.{1,24}/gs).map((part) => `data: ${JSON.stringify({ id: "stub", choices: [{ index: 0, delta: { content: part }, finish_reason: null }] })}\n\n`);
-    chunks.push(`data: ${JSON.stringify({ id: "stub", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`);
-    return new Response(new ReadableStream({
-      async start(controller) {
-        for (const chunk of chunks) { controller.enqueue(new TextEncoder().encode(chunk)); await new Promise((r) => setTimeout(r, 10)); }
-        controller.close();
-      },
-    }), { headers: { "Content-Type": "text/event-stream" } });
+    const content = JSON.stringify({
+      summary:
+        "**Review** the contribution details below. Nothing has been recorded.",
+      activity: intent,
+    });
+    const chunks = content
+      .match(/.{1,24}/gs)
+      .map(
+        (part) =>
+          `data: ${JSON.stringify({ id: "stub", choices: [{ index: 0, delta: { content: part }, finish_reason: null }] })}\n\n`,
+      );
+    chunks.push(
+      `data: ${JSON.stringify({ id: "stub", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+    );
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(new TextEncoder().encode(chunk));
+            await new Promise((r) => setTimeout(r, 10));
+          }
+          controller.close();
+        },
+      }),
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
   };
 }

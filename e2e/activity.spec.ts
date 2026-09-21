@@ -86,9 +86,26 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
       await page.getByLabel("Describe bill activity").fill(text);
       await page.getByRole("button", { name: "Send activity" }).click();
     };
+    await page.getByLabel("Upload reference document").setInputFiles({
+      name: "electricity.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from(
+        "Electricity total $186.42, due 2027-09-28. contact@example.com",
+      ),
+    });
+    await expect(page.getByLabel("Source text")).toContainText(
+      "[email omitted]",
+    );
+    await page.getByRole("button", { name: "Use source", exact: true }).click();
+    await expect(page.getByLabel("Attached references")).toContainText(
+      "electricity.txt",
+    );
     await submit("I paid $40 toward electricity");
     const proposal = page.getByTestId("activity-proposal");
     await expect(proposal).toContainText("Remaining after: $22.14");
+    await expect(
+      page.getByLabel("Conversation").locator("strong"),
+    ).toContainText("Review");
     expect(
       (
         await pool.query(
@@ -242,7 +259,15 @@ test("mobile activity: real signed proposals, clarification, cancel, retry, and 
     // Ensure the chat remains compact and reachable at a keyboard-sized viewport.
     await page.setViewportSize({ width: 390, height: 450 });
     await submit("I paid $10 toward water");
-    await submit("The total is $90, due 2027-09-28");
+    await page
+      .getByRole("button", { name: "Paste source", exact: true })
+      .click();
+    await page.getByLabel("Source name").fill("Water statement");
+    await page
+      .getByLabel("Source text")
+      .fill("Water total $90.00 due 2027-09-28");
+    await page.getByRole("button", { name: "Use source", exact: true }).click();
+    await submit("Use the attached bill details");
     await expect(
       page.getByRole("button", { name: "Confirm", exact: true }),
     ).toBeInViewport();

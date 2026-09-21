@@ -13,7 +13,7 @@ import { activitySourcesSchema } from "@/lib/domain/activity-sources";
 import { normalizeName } from "@/lib/domain/activity";
 import type { ActivityMessage } from "@/lib/domain/activity-chat";
 export const runtime = "nodejs";
-export const maxDuration = 40;
+export const maxDuration = 50;
 const requestSchema = z.object({
   householdId: z.uuid(),
   sources: activitySourcesSchema.optional(),
@@ -49,7 +49,10 @@ export async function POST(request: Request) {
         writer.write({ type: "start" });
         let textStarted = false;
         const finishText = () => {
-          if (textStarted) { writer.write({ type: "text-end", id: "summary" }); textStarted = false; }
+          if (textStarted) {
+            writer.write({ type: "text-end", id: "summary" });
+            textStarted = false;
+          }
         };
         try {
           let reply;
@@ -66,7 +69,10 @@ export async function POST(request: Request) {
               sources: body.sources,
               onSummary: (delta) => {
                 if (!delta) return;
-                if (!textStarted) { writer.write({ type: "text-start", id: "summary" }); textStarted = true; }
+                if (!textStarted) {
+                  writer.write({ type: "text-start", id: "summary" });
+                  textStarted = true;
+                }
                 writer.write({ type: "text-delta", id: "summary", delta });
               },
             });
